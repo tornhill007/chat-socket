@@ -43,7 +43,7 @@ const m = (name, text, id) => ({name, text, id})
 io.on("connection", (socket) => {
     connections.push(socket);
     console.log(socket.handshake.query.loggeduser);
-    if(socket.handshake.query.loggeduser !== "null") {
+    if (socket.handshake.query.loggeduser !== "null") {
         connectedUsers.add({socketId: socket.id, userId: socket.handshake.query.loggeduser})
     }
 
@@ -52,7 +52,7 @@ io.on("connection", (socket) => {
     socket.on("users/left", (id, callback) => {
         console.log(users);
         const user = users.remove(id);
-        if(user) {
+        if (user) {
             io.to(user.room).emit('messages/new', m("admin", `User ${user.name} left`));
             // let rooms = Array.from(io.sockets.adapter.rooms).map(item => {
             //     return item[0];
@@ -60,7 +60,7 @@ io.on("connection", (socket) => {
             // let createdRooms = roomsInstance.getAllRooms();
             io.to(user.room).emit("users/update", users.getByRoom(user.room));
             let userInRoom = users.getByRoom(user.room);
-            if(!userInRoom || userInRoom.length === 0) {
+            if (!userInRoom || userInRoom.length === 0) {
                 roomsInstance.remove(user.room);
                 let createdRooms = roomsInstance.getAllRooms();
                 io.emit("rooms/getAll", createdRooms)
@@ -87,10 +87,9 @@ io.on("connection", (socket) => {
         }
         let roomId;
 
-        if(data.room.id) {
+        if (data.room.id) {
             roomId = data.room.id
-        }
-        else {
+        } else {
             roomId = generateUID();
             socket.emit('rooms/generateId', roomId);
         }
@@ -105,7 +104,7 @@ io.on("connection", (socket) => {
         })
 
         let room = roomsInstance.get(roomId);
-        if(!room) {
+        if (!room) {
             data.room.id = roomId
             roomsInstance.add(data.room);
         }
@@ -116,10 +115,6 @@ io.on("connection", (socket) => {
         io.to(roomId).emit("users/update", users.getByRoom(roomId));
 
         socket.emit('messages/new', m('admin', `Welcome, ${data.userName}`));
-
-        let rooms = Array.from(io.sockets.adapter.rooms).map(item => {
-            return item[0];
-        });
 
         let createdRooms = roomsInstance.getAllRooms();
 
@@ -133,14 +128,14 @@ io.on("connection", (socket) => {
         connections.splice(connections.indexOf(socket), 1);
         console.log("correct disconnection")
         const connectedUser = connectedUsers.get(socket.id);
-        if(connectedUser) {
+        if (connectedUser) {
             const user = users.remove(connectedUser.userId);
-            if(user) {
+            if (user) {
                 io.to(user.room).emit("users/update", users.getByRoom(user.room));
                 io.to(user.room).emit("messages/new", m("admin", `User ${user.name} left`))
 
                 let userInRoom = users.getByRoom(user.room);
-                if(!userInRoom || userInRoom.length === 0) {
+                if (!userInRoom || userInRoom.length === 0) {
                     roomsInstance.remove(user.room);
                     let createdRooms = roomsInstance.getAllRooms();
                     io.emit("rooms/getAll", createdRooms)
