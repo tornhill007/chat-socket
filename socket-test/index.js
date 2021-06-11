@@ -8,7 +8,7 @@ const roomsInstance = require('./rooms')();
 const connectedUsers = require('./connectedUsers')();
 const passport = require("passport");
 const sequelize = require('./config/database')
-
+const generateUID = require('./common/generateUID')
 
 const auth = require('./routes/auth');
 const usersRoute = require('./routes/users');
@@ -27,10 +27,8 @@ sequelize.authenticate().then(() => {
 app.use(auth);
 app.use(usersRoute);
 
-
 app.use(passport.initialize());
 require('./middleware/passport')(passport);
-
 
 const io = require("socket.io")(httpServer, {
     cors: {
@@ -39,11 +37,6 @@ const io = require("socket.io")(httpServer, {
 });
 
 let connections = [];
-// let users = [];
-
-// io.on("connection", (socket) => {
-//     console.log(socket.id); // ojIckSD2jqNzOqIrAGzL
-// });
 
 const m = (name, text, id) => ({name, text, id})
 
@@ -56,68 +49,73 @@ io.on("connection", (socket) => {
 
     console.log("correct connection")
 
-
-    socket.on("leftUser", (id, callback) => {
+    socket.on("users/left", (id, callback) => {
         console.log(users);
         const user = users.remove(id);
         if(user) {
-            io.to(user.room).emit('newMessage', m("admin", `User ${user.name} left`));
+            io.to(user.room).emit('messages/new', m("admin", `User ${user.name} left`));
             // let rooms = Array.from(io.sockets.adapter.rooms).map(item => {
             //     return item[0];
             // });
             // let createdRooms = roomsInstance.getAllRooms();
-            io.to(user.room).emit("updateUsers", users.getByRoom(user.room));
+            io.to(user.room).emit("users/update", users.getByRoom(user.room));
             let userInRoom = users.getByRoom(user.room);
             if(!userInRoom || userInRoom.length === 0) {
                 roomsInstance.remove(user.room);
                 let createdRooms = roomsInstance.getAllRooms();
-                io.emit("getAllRooms", createdRooms)
+                io.emit("rooms/getAll", createdRooms)
             }
 
         }
         callback();
     })
 
-
-    socket.on("getRooms", (data, callback) => {
+    socket.on("rooms/get", (data, callback) => {
         // let rooms = Array.from(io.sockets.adapter.rooms).map(item => {
         //     return item[0];
         // });
         let createdRooms = roomsInstance.getAllRooms();
-        socket.emit("getAllRooms", createdRooms)
+        socket.emit("rooms/getAll", createdRooms)
         callback();
     })
     // let rooms = io.sockets.adapter.rooms;
     // socket.emit("getAllRooms", rooms)
 
-
-
-    socket.on("userJoined", (data, callback) => {
+    socket.on("users/joined", (data, callback) => {
         if (!data) {
             return callback("Incorrect data")
         }
+        let roomId;
 
-        socket.join(data.room.id)
+        if(data.room.id) {
+            roomId = data.room.id
+        }
+        else {
+            roomId = generateUID();
+            socket.emit('rooms/generateId', roomId);
+        }
+
+        socket.join(roomId)
 
         users.remove(data.id);
         users.add({
             id: data.id,
             name: data.userName,
-            room: data.room.id
+            room: roomId
         })
 
-        let room = roomsInstance.get(data.room.id);
+        let room = roomsInstance.get(roomId);
         if(!room) {
+            data.room.id = roomId
             roomsInstance.add(data.room);
         }
-
 
         callback({userId: data.id})
 
         // let usersInRoom =  users.getByRoom(data.room.id);
-        io.to(data.room.id).emit("updateUsers", users.getByRoom(data.room.id));
+        io.to(roomId).emit("users/update", users.getByRoom(roomId));
 
-        socket.emit('newMessage', m('admin', `Welcome, ${data.userName}`));
+        socket.emit('messages/new', m('admin', `Welcome, ${data.userName}`));
 
         let rooms = Array.from(io.sockets.adapter.rooms).map(item => {
             return item[0];
@@ -125,12 +123,11 @@ io.on("connection", (socket) => {
 
         let createdRooms = roomsInstance.getAllRooms();
 
-        io.emit("getAllRooms", createdRooms)
+        io.emit("rooms/getAll", createdRooms)
 
 
-        socket.broadcast.to(data.room.id).emit('newMessage', m('admin', `User ${data.userName} joined`))
+        socket.broadcast.to(roomId).emit('messages/new', m('admin', `User ${data.userName} joined`))
     })
-
 
     socket.on('disconnect', (data) => {
         connections.splice(connections.indexOf(socket), 1);
@@ -139,21 +136,18 @@ io.on("connection", (socket) => {
         if(connectedUser) {
             const user = users.remove(connectedUser.userId);
             if(user) {
-                io.to(user.room).emit("updateUsers", users.getByRoom(user.room));
-                io.to(user.room).emit("newMessage", m("admin", `User ${user.name} left`))
+                io.to(user.room).emit("users/update", users.getByRoom(user.room));
+                io.to(user.room).emit("messages/new", m("admin", `User ${user.name} left`))
 
                 let userInRoom = users.getByRoom(user.room);
                 if(!userInRoom || userInRoom.length === 0) {
                     roomsInstance.remove(user.room);
                     let createdRooms = roomsInstance.getAllRooms();
-                    io.emit("getAllRooms", createdRooms)
+                    io.emit("rooms/getAll", createdRooms)
                 }
             }
 
         }
-
-
-
 
     })
 
@@ -178,7 +172,7 @@ io.on("connection", (socket) => {
 
         const user = users.get(data.id);
         if (user) {
-            io.to(user.room).emit('newMessage', m(user.name, data.message, data.id))
+            io.to(user.room).emit('messages/new', m(user.name, data.message, data.id))
         }
         callback();
 
