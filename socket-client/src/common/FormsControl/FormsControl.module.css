@@ -1,0 +1,39 @@
+.form-control {
+
+}
+
+.formControl.error input,
+.formControl.error textarea {
+    border: solid red 2px;
+}
+
+.formControl.error span {
+    color: red;
+}
+
+.padding {
+    width: 90%;
+    height: 44px;
+    margin: .8em .5em;
+
+}
+
+@media (max-width: 330px) {
+    .padding {
+        height: 30px;
+    }
+}
+
+
+/*.padding:focus {*/
+/*    transition: background-color .2s ease-in-out 0s,border-color .2s ease-in-out 0s;*/
+/*}*/
+
+/*.padding:focus {*/
+/*    background-color: white;*/
+/*    border: 2px solid #4C9AFF;*/
+/*    box-shadow: 0 0 0;*/
+/*}*/
+/*.padding::-moz-focus-inner {*/
+/*    border-color: green;*/
+/*}*/
