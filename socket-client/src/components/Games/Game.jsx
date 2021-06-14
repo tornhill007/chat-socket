@@ -57,7 +57,7 @@ class Home extends React.Component {
         this.props.socket && this.props.socket.emit("users/left", userId, () => {
             console.log("USER LEFT ROOM");
             this.props.setInRoom(false);
-
+            // this.props.resetRoomHistory()
         })
     }
 

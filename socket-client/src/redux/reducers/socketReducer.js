@@ -18,7 +18,8 @@ let initialState = {
     inRoom: null,
     idRoom: null,
     roomHistory: [],
-    isMounted: false
+    isMounted: false,
+    isOneRendered: false
 };
 
 const authReducer = (state = initialState, action) => {
@@ -72,9 +73,13 @@ const authReducer = (state = initialState, action) => {
                 return item
             })
             console.log("[modifiedHistory]", modifiedHistory)
+            modifiedHistory.length > 0 && modifiedHistory.splice(-1,1);
+            // let roomHistory = (modifiedHistory.length === 1 && !state.isOneRendered) ? [] : modifiedHistory
+            // console.log("modifiedHistory", modifiedHistory)
             return {
                 ...state,
-                roomHistory: modifiedHistory.length === 1 ? [] : modifiedHistory
+                roomHistory: modifiedHistory,
+                isOneRendered: true
             };
         case SET_IN_ROOM:
             return {

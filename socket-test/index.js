@@ -10,6 +10,8 @@ const passport = require("passport");
 const sequelize = require('./config/database')
 const generateUID = require('./common/generateUID')
 const History = require('./models/History')
+const jwt = require("jsonwebtoken");
+const keys = require('./config/keys');
 
 const auth = require('./routes/auth');
 const usersRoute = require('./routes/users');
@@ -47,6 +49,7 @@ io.on("connection", (socket) => {
     connections.push(socket);
     console.log(socket.handshake.query.loggeduser);
     if (socket.handshake.query.loggeduser !== "null") {
+        // let decoded = jwt.verify(socket.handshake.query.loggeduser, keys.jwt);
         connectedUsers.add({socketId: socket.id, userId: socket.handshake.query.loggeduser})
     }
 
