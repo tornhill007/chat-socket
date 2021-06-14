@@ -3,3 +3,44 @@
     flex-direction: column;
     align-items: flex-start;
 }
+
+
+
+.wrapMessages {
+    display: flex;
+    /*justify-content: center;*/
+    flex-direction: column;
+    /*align-items: flex-start;*/
+    /*text-align: left!important;*/
+    width: 300px;
+}
+
+.wrapWrapper {
+    display: flex;
+    justify-content: center;
+    /*padding: 5px;*/
+}
+
+.itemRight {
+    text-align: right;
+    padding: 20px 5px;
+    background-color: #61dafb;
+    border-radius: 3px;
+    margin: 5px;
+}
+
+.itemLeft {
+    margin: 5px;
+    text-align: left;
+    padding: 20px 5px;
+    background-color: gray;
+    border-radius: 3px;
+}
+
+.itemLeftUser {
+    margin: 5px;
+    text-align: left;
+    padding: 20px 5px;
+    background-color: brown;
+    border-radius: 3px;
+}

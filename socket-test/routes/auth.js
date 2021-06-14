@@ -36,7 +36,7 @@ router.post("/login", catchWrap(async (req, res) => {
     }, keys.jwt, {expiresIn: 60 * 60});
 
     res.status(200).json({
-        token: `Bearer ${token}`,
+        token: `${token}`,
         userName: user[0].dataValues.username,
         userId: user[0].dataValues.userid
     })

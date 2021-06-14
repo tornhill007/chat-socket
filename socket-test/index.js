@@ -9,9 +9,11 @@ const connectedUsers = require('./connectedUsers')();
 const passport = require("passport");
 const sequelize = require('./config/database')
 const generateUID = require('./common/generateUID')
+const History = require('./models/History')
 
 const auth = require('./routes/auth');
 const usersRoute = require('./routes/users');
+const history = require('./routes/history');
 
 //Test DB
 app.use(cors());
@@ -23,9 +25,10 @@ sequelize.authenticate().then(() => {
 }).catch((err) => {
     console.log("Error:" + err);
 })
-
+// app.use(passport.authenticate('jwt', {session: false}));
 app.use(auth);
 app.use(usersRoute);
+app.use(history);
 
 app.use(passport.initialize());
 require('./middleware/passport')(passport);
@@ -49,21 +52,34 @@ io.on("connection", (socket) => {
 
     console.log("correct connection")
 
-    socket.on("users/left", (id, callback) => {
+    socket.on("users/left", async (id, callback) => {
         console.log(users);
         const user = users.remove(id);
         if (user) {
+            // let history = await History
             io.to(user.room).emit('messages/new', m("admin", `User ${user.name} left`));
-            // let rooms = Array.from(io.sockets.adapter.rooms).map(item => {
-            //     return item[0];
-            // });
-            // let createdRooms = roomsInstance.getAllRooms();
+
+            let history = await History.findOne({
+                where: {
+                    roomid: user.room
+                }
+            });
+            const cloneHistory = JSON.parse(JSON.stringify(history.history));
+            cloneHistory.push({name: 'admin', text: `User ${user.name} left`});
+            history.history = cloneHistory;
+            await history.save();
             io.to(user.room).emit("users/update", users.getByRoom(user.room));
             let userInRoom = users.getByRoom(user.room);
             if (!userInRoom || userInRoom.length === 0) {
                 roomsInstance.remove(user.room);
                 let createdRooms = roomsInstance.getAllRooms();
                 io.emit("rooms/getAll", createdRooms)
+                let history = await History.findOne({
+                    where: {
+                        roomid: user.room
+                    }
+                });
+                await history.destroy();
             }
 
         }
@@ -81,7 +97,7 @@ io.on("connection", (socket) => {
     // let rooms = io.sockets.adapter.rooms;
     // socket.emit("getAllRooms", rooms)
 
-    socket.on("users/joined", (data, callback) => {
+    socket.on("users/joined", async (data, callback) => {
         if (!data) {
             return callback("Incorrect data")
         }
@@ -116,15 +132,62 @@ io.on("connection", (socket) => {
 
         socket.emit('messages/new', m('admin', `Welcome, ${data.userName}`));
 
+        let history;
+        let cloneHistory;
+        // let cloneHistory;
+        history = await History.findOne({
+            where: {
+                roomid: roomId
+            }
+        });
+
+        if (!history) {
+            history = History.build({
+                roomid: roomId,
+                history: [{name: 'admin', text: `Welcome, ${data.userName}`}]
+            })
+        } else {
+            cloneHistory = JSON.parse(JSON.stringify(history.history));
+            cloneHistory.push({name: 'admin', text: `Welcome, ${data.userName}`})
+            history.history = cloneHistory;
+        }
+
+        // let history = await History.findOne({
+        //     where: {
+        //         id: roomId
+        //     }
+        // });s
+        // // if()
+        //
+        // JSON.parse(history.history).push({name: 'admin', text: `Welcome, ${data.userName}`});
+        // await history.save();
+
         let createdRooms = roomsInstance.getAllRooms();
 
         io.emit("rooms/getAll", createdRooms)
 
-
         socket.broadcast.to(roomId).emit('messages/new', m('admin', `User ${data.userName} joined`))
+
+        if (cloneHistory) {
+            cloneHistory.push({name: 'admin', text: `User ${data.userName} joined`})
+            history.history = cloneHistory;
+        }
+        else {
+            cloneHistory = JSON.parse(JSON.stringify(history.history));
+            cloneHistory.push({name: 'admin', text: `User ${data.userName} joined`})
+            history.history = cloneHistory;
+        }
+
+
+
+        await history.save();
+
+        // cloneHistory.push({name: 'admin', text: `User ${data.userName} joined`})
+        // history.history = cloneHistory;
+        // await history.save();
     })
 
-    socket.on('disconnect', (data) => {
+    socket.on('disconnect', async (data) => {
         connections.splice(connections.indexOf(socket), 1);
         console.log("correct disconnection")
         const connectedUser = connectedUsers.get(socket.id);
@@ -133,12 +196,27 @@ io.on("connection", (socket) => {
             if (user) {
                 io.to(user.room).emit("users/update", users.getByRoom(user.room));
                 io.to(user.room).emit("messages/new", m("admin", `User ${user.name} left`))
+                let history = await History.findOne({
+                    where: {
+                        roomid: user.room
+                    }
+                });
+                const cloneHistory = JSON.parse(JSON.stringify(history.history));
+                cloneHistory.push({name: 'admin', text: `User ${user.name} left`});
+                history.history = cloneHistory;
+                await history.save();
 
                 let userInRoom = users.getByRoom(user.room);
                 if (!userInRoom || userInRoom.length === 0) {
                     roomsInstance.remove(user.room);
                     let createdRooms = roomsInstance.getAllRooms();
-                    io.emit("rooms/getAll", createdRooms)
+                    io.emit("rooms/getAll", createdRooms);
+                    let history = await History.findOne({
+                        where: {
+                            roomid: user.room
+                        }
+                    });
+                    await history.destroy();
                 }
             }
 
@@ -159,7 +237,7 @@ io.on("connection", (socket) => {
     //
     // })
 
-    socket.on("createMessage", (data, callback) => {
+    socket.on("createMessage", async (data, callback) => {
 
         if (!data) {
             return callback('Incorrect data');
@@ -168,6 +246,15 @@ io.on("connection", (socket) => {
         const user = users.get(data.id);
         if (user) {
             io.to(user.room).emit('messages/new', m(user.name, data.message, data.id))
+            let history = await History.findOne({
+                where: {
+                    roomid: user.room
+                }
+            });
+            const cloneHistory = JSON.parse(JSON.stringify(history.history));
+            cloneHistory.push({name: `${user.name}`, text: `${data.message}`});
+            history.history = cloneHistory;
+            await history.save();
         }
         callback();
 
