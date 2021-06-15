@@ -11,10 +11,14 @@ class ConnectedUsers {
         return this.connectedUsers.find(user => user.socketId === socketId)
     }
 
+    getAll() {
+        return this.connectedUsers;
+    }
+
     remove(id) {
         const user = this.get(id);
         if (user) {
-            this.connectedUsers = this.connectedUsers.filter(user => user.id !== id);
+            this.connectedUsers = this.connectedUsers.filter(user => user.socketId !== id);
         }
         return user;
     }

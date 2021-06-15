@@ -20,6 +20,7 @@ class Users {
     }
 
     getByRoom(room) {
+        console.log(room)
         return this.users.filter(user => user.room === room);
     }
 }
