@@ -4,6 +4,7 @@ const cors = require("cors");
 const httpServer = require("http").createServer(app);
 const options = { /* ... */};
 const users = require('./users')();
+const usersTmp = require('./usersTmp')();
 const roomsInstance = require('./rooms')();
 const connectedUsers = require('./connectedUsers')();
 const passport = require("passport");
@@ -67,9 +68,19 @@ io.on("connection", async (socket) => {
             if (userInfo.userid === decoded.userId) {
                 let allConnectedUser = connectedUsers.getAll();
                 let removedConnectedUser = connectedUsers.remove(socket.id)
-                let amountUsersConnected = allConnectedUser.filter(item => item.userId === userInfo.userid);
-                if(amountUsersConnected.length <= 1) {
-                    const user = users.remove(userInfo.userid);
+                // let amountUsersConnected = allConnectedUser.filter(item => item.userId === userInfo.userid);
+                // const connectedUser = connectedUsers.get(socket.id);
+                // if(connectedUser) {
+                let removedUser = usersTmp.remove(removedConnectedUser.userId, socket.id);
+                let usersInRoom = usersTmp.getByRoom(removedUser.room);
+                console.log(usersInRoom)
+                let isUserInRoom = usersInRoom.find(item => item.id === removedConnectedUser.userId);
+                let user;
+                if(!isUserInRoom) {
+                    user = users.remove(removedConnectedUser.userId);
+                }
+                // if(amountUsersConnected.length <= 1) {
+                    // const user = users.remove(userInfo.userid);
                     if (user) {
                         io.to(user.room).emit('messages/new', m("admin", `User ${user.name} left`));
 
@@ -96,8 +107,7 @@ io.on("connection", async (socket) => {
                             await history.destroy();
                         }
                     }
-                }
-
+                // }
                 callback();
             }
         }
@@ -124,16 +134,23 @@ io.on("connection", async (socket) => {
 
         let decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
         let user = await Users.getUserByUserId(decoded.userId);
-        let usersInRoom = users.getByRoom(data.room.id);
+        let usersInRoom = users.getByRoom(roomId);
 
         socket.join(roomId);
+
+        usersTmp.add({
+            id: user.userid,
+            name: user.username,
+            room: roomId,
+            socketId: socket.id
+        })
 
         let isUserInRoom = usersInRoom.find(item => item.id === user.userid)
 
         if (user && !isUserInRoom) {
 
             if (user.userid === decoded.userId) {
-                users.remove(user.userid);
+                // users.remove(user.userid);
                 users.add({
                     id: user.userid,
                     name: user.username,
@@ -196,15 +213,19 @@ io.on("connection", async (socket) => {
         console.log("correct disconnection")
         const connectedUser = connectedUsers.get(socket.id);
         if (connectedUser) {
-
             let removedConnectedUser = connectedUsers.remove(socket.id)
-
             let inUserConnected = connectedUsers.getAll();
-            let isUserInRoom = inUserConnected.find(item => item.userId === connectedUser.userId);
-
-            if (!isUserInRoom) {
-                const user = users.remove(connectedUser.userId);
-
+            console.log(usersTmp);
+            let removedUser = usersTmp.remove(connectedUser.userId, socket.id);
+           let usersInRoom = usersTmp.getByRoom(removedUser.room)
+            console.log(usersInRoom)
+            // let isUserInRoom = inUserConnected.find(item => item.userId === connectedUser.userId);
+            let isUserInRoom = usersInRoom.find(item => item.id === connectedUser.userId);
+            let user;
+           if(!isUserInRoom) {
+               user = users.remove(connectedUser.userId);
+           }
+            // if (usersInRoom.length === 0) {
                 if (user) {
                     io.to(user.room).emit("users/update", users.getByRoom(user.room));
                     io.to(user.room).emit("messages/new", m("admin", `User ${user.name} left`))
@@ -232,7 +253,7 @@ io.on("connection", async (socket) => {
                         await history.destroy();
                     }
                 }
-            }
+            // }
         }
     })
 

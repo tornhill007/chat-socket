@@ -3,8 +3,16 @@ import React from "react";
 import {NavLink, Redirect} from "react-router-dom";
 import {connect} from "react-redux";
 import {generateUID} from "../../utils/generateUID";
-import {setIdRoom, setInRoom, setRooms, setSocket, setUsersToRoom} from "../../redux/reducers/socketReducer";
+import {
+    setIdRoom,
+    setInRoom,
+    setIsMounted,
+    setRooms,
+    setSocket,
+    setUsersToRoom
+} from "../../redux/reducers/socketReducer";
 import {withRouter} from 'react-router-dom';
+import classes from './Home.module.css';
 
 
 class Home extends React.Component {
@@ -55,17 +63,36 @@ class Home extends React.Component {
 
     componentDidMount() {
 
+        let socket;
+        console.log("KEKEKE", this.props.isMounted)
+        // if(!this.props.isMounted) {
+            console.log("OLAOLALOLAOAL")
+            // let token = JSON.parse(localStorage.getItem('user')).token;
+            socket = io('http://192.168.1.229:8080/', {query: `loggeduser=${this.props.token}`});
+            // socket.connect();
+            socket.emit("rooms/get", {}, (data) => {
+            })
 
-        const socket = io('http://192.168.1.229:8080/', {query:`loggeduser=${this.props.token}`});
-        // socket.connect();
-        socket.emit("rooms/get", {}, (data) => {
-        })
+            socket.on("rooms/getAll", (data) => {
+                console.log("[ROOMS]", data);
+                this.setRooms(data);
 
-        socket.on("rooms/getAll", (data) => {
-            console.log("[ROOMS]", data);
-            this.setRooms(data);
+            })
 
-        })
+            socket.on("users/update", (data) => {
+                console.log("[USERS]", data);
+                this.setUsersToRoom(data);
+            })
+
+            socket.on('rooms/generateId', (data) => {
+                console.log("ID_ROOM", data)
+
+                this.props.setIdRoom(data);
+            })
+        // }
+        //     this.props.setIsMounted();
+        // }
+
 
         // let rooms = io.sockets.adapter.rooms;
         // console.log("ROOMS", rooms)
@@ -82,15 +109,7 @@ class Home extends React.Component {
         //     this.setMessage(data)
         // })
 
-        socket.on("users/update", (data) => {
-            console.log("[USERS]", data);
-            this.setUsersToRoom(data);
-        })
 
-        socket.on('rooms/generateId', (data) => {
-            console.log("ID_ROOM", data)
-            this.props.setIdRoom(data);
-        })
 
 
 
@@ -113,7 +132,8 @@ class Home extends React.Component {
     }
 
     onCreateRoom = (roomId) => {
-        this.props.socket && this.props.socket.emit("users/joined", {userName: this.props.userName, id: this.props.token, room: {name: this.state.roomInput, id: roomId ? roomId : null}}, (data) => {
+        console.log("ROOM_ID", roomId)
+        this.props.socket && this.props.socket.emit("users/joined", {room: {name: this.state.roomInput, id: roomId ? roomId : null}}, (data) => {
             if(typeof data === 'string') {
                 console.error(data);
             }
@@ -158,7 +178,7 @@ class Home extends React.Component {
                 </div>
                 <div onClick={() => {this.props.setInRoom(true); this.onCreateRoom()}}>
                     {/*to={`/game/${generateUID()}`*/}
-                <div>
+                <div className={classes.itemCreate}>
                     create room
                 </div>
                     {/*<NavLink>*/}
@@ -179,9 +199,10 @@ const mapStateToProps = (state) => ({
     users: state.socketPage.users,
     rooms: state.socketPage.rooms,
     inRoom: state.socketPage.inRoom,
-    idRoom: state.socketPage.idRoom
+    idRoom: state.socketPage.idRoom,
+    isMounted: state.socketPage.isMounted,
 })
 
 // let AuthRedirectComponent = withAuthRedirect(Home);
 
-export default withRouter(connect(mapStateToProps, {setSocket, setIdRoom, setInRoom, setUsersToRoom, setRooms})(Home));
+export default withRouter(connect(mapStateToProps, {setSocket, setIsMounted, setIdRoom, setInRoom, setUsersToRoom, setRooms})(Home));

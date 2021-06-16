@@ -8,7 +8,9 @@ class ConnectedUsers {
     }
 
     get(socketId) {
+        console.log(socketId)
         return this.connectedUsers.find(user => user.socketId === socketId)
+
     }
 
     getAll() {

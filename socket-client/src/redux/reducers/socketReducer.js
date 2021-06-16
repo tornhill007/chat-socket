@@ -1,5 +1,4 @@
 import {authAPI, historyApi} from "../../api/api";
-import {reset} from "redux-form";
 
 const SET_SOCKET = 'SET_SOCKET';
 const SET_USERS_TO_ROOM = 'SET_USERS_TO_ROOM';
@@ -45,8 +44,20 @@ const authReducer = (state = initialState, action) => {
                 roomHistory: []
             };
         case UPDATE_MESSAGE:
-            let clone = JSON.parse(JSON.stringify(state.roomHistory));
-            clone.push(action.message);
+            console.log("roomHistory", state.roomHistory);
+            let clone;
+            if(!action.message.text && state.roomHistory.length === 0) {
+                clone = JSON.parse(JSON.stringify(state.roomHistory));
+                action.message.text = `Welcome, ${action.userName}`
+                clone.push(action.message);
+            }
+            else if (!action.message.text && state.roomHistory.length !== 0) {
+                return state
+            }
+            else {
+                clone = JSON.parse(JSON.stringify(state.roomHistory));
+                clone.push(action.message);
+            }
             return {
                 ...state,
                 roomHistory: clone
@@ -60,6 +71,7 @@ const authReducer = (state = initialState, action) => {
         case SET_ROOM_HISTORY:
             let roomHistoryClone = JSON.parse(JSON.stringify(state.roomHistory));
             let wordsUserName = action.history.map(item => item.text.split(' '))
+            console.log(action.history);
             let newHistory = action.history.filter((item, index) => {
                 return (!(wordsUserName[index][1] && wordsUserName[index][1] === action.userName && wordsUserName[index][2] === 'joined')) && !(wordsUserName[index][0] === 'Welcome,' && wordsUserName[index][1] !== action.userName)
             })
@@ -67,15 +79,14 @@ const authReducer = (state = initialState, action) => {
             let modifiedHistory = newHistory.map((item, index) => {
                 if ((wordsNewHistory[index][0] === 'User' && wordsNewHistory[index][1] === action.userName && wordsNewHistory[index][2] && wordsNewHistory[index][2] === 'left')) {
                     item.text = 'You are left';
-                } else if ((wordsNewHistory[index][0] === 'Welcome,' && wordsNewHistory[index][1] === action.userName )) {
+                } else if ((wordsNewHistory[index][0] === 'Welcome,' && wordsNewHistory[index][1] === action.userName)) {
                     item.text = 'You are joined';
                 }
                 return item
             })
-            console.log("[modifiedHistory]", modifiedHistory)
-            modifiedHistory.length > 0 && modifiedHistory.splice(-1,1);
-            // let roomHistory = (modifiedHistory.length === 1 && !state.isOneRendered) ? [] : modifiedHistory
-            // console.log("modifiedHistory", modifiedHistory)
+            console.log("modifiedHistory", modifiedHistory);
+            let wordMidified = modifiedHistory.map(item => item.text.split(' '))
+            modifiedHistory.length > 0 && wordMidified[wordMidified.length - 1][0] === 'You' && modifiedHistory.splice(-1, 1);
             return {
                 ...state,
                 roomHistory: modifiedHistory,
@@ -106,6 +117,7 @@ export const setUsersToRoom = (users) => ({
     type: SET_USERS_TO_ROOM,
     users
 });
+
 export const setIsMounted = () => ({
     type: SET_IS_MOUNTED,
 });
@@ -130,19 +142,19 @@ export const setRoomHistory = (history, userName) => ({
     history, userName
 });
 
-export const updateMessage = (message) => ({
+export const updateMessage = (message, userName) => ({
     type: UPDATE_MESSAGE,
-    message
+    message, userName
 });
 
 export const resetRoomHistory = () => ({
     type: RESET_ROOM_HISTORY,
 });
 
-
 export const getRoomHistory = (roomId, userName) => async (dispatch) => {
     try {
         let response = await historyApi.getRoomHistory(roomId);
+
         console.log('[HISTORY]', response)
         dispatch(setRoomHistory(response.data.history, userName))
     } catch (err) {
@@ -150,27 +162,5 @@ export const getRoomHistory = (roomId, userName) => async (dispatch) => {
     }
 
 };
-//
-// export const register = (password, userName, repeatPassword) => async (dispatch) => {
-//     try {
-//         if(password === repeatPassword) {
-//             let response = await authAPI.register(password, userName);
-//             if (response.statusText === 'OK') {
-//                 dispatch(reset('register'))
-//                 alert('you have registered')
-//             } else {
-//                 let message = response.data.messages.length > 0 ? response.data.messages[0] : "Some error";
-//                 alert(message);
-//             }
-//         }
-//         else {
-//             alert("Password mismatch")
-//         }
-//
-//     } catch (err) {
-//         alert(err);
-//     }
-//
-// };
 
 export default authReducer;

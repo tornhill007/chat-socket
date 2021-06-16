@@ -6,7 +6,7 @@ import {withRouter} from 'react-router-dom';
 import classes from './Game.module.css';
 import {
     getRoomHistory,
-    resetRoomHistory,
+    resetRoomHistory, setIdRoom,
     setInRoom,
     setIsMounted,
     updateMessage
@@ -54,10 +54,11 @@ class Home extends React.Component {
     }
 
     onExitFromRoom = (userId) => {
-        this.props.socket && this.props.socket.emit("users/left", userId, () => {
+        this.props.socket && this.props.socket.emit("users/left", () => {
             console.log("USER LEFT ROOM");
             this.props.setInRoom(false);
-            // this.props.resetRoomHistory()
+            this.props.setIdRoom(null);
+            this.props.resetRoomHistory()
         })
     }
 
@@ -71,17 +72,15 @@ class Home extends React.Component {
         //     })
         // }, 100)
 
-
         // {this.props.socket && !this.props.inRoom && this.onCreateRoom()}
 
         // this.props.setInRoom(true);
-
 
             this.props.socket && this.props.socket.on("messages/new", (data) => {
                 console.log("[DATA]", data);
                 // this.setMessage(data)
                 setTimeout(() => {
-                    this.props.updateMessage(data)
+                    this.props.updateMessage(data, this.props.userName)
                 }, 100)
 
             })
@@ -129,7 +128,7 @@ class Home extends React.Component {
     }
 
     onAddMessage = () => {
-        this.props.socket && this.props.socket.emit("createMessage", {message: this.state.textInput, id: this.props.token}, (data) => {
+        this.props.socket && this.props.socket.emit("createMessage", {message: this.state.textInput}, (data) => {
             console.log(['data'], data)
         });
     }
@@ -155,7 +154,7 @@ class Home extends React.Component {
 
     render() {
         console.log(this.state.user)
-        console.log("123", this.props.users)
+        console.log("[roomHistory]", this.props.roomHistory)
         console.log('[allMsg]', this.state.allMsg)
         if(this.props.inRoom === false || this.props.inRoom === null) {
             return <Redirect to='/'/>
@@ -227,4 +226,4 @@ const mapStateToProps = (state) => ({
 
 // let AuthRedirectComponent = withAuthRedirect(Home);
 
-export default withRouter(connect(mapStateToProps, {setInRoom, setIsMounted, updateMessage, resetRoomHistory, getRoomHistory})(Home));
+export default withRouter(connect(mapStateToProps, {setInRoom, setIdRoom, setIsMounted, updateMessage, resetRoomHistory, getRoomHistory})(Home));
