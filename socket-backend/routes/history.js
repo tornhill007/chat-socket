@@ -11,21 +11,21 @@ const catchWrap = require("../common/wrapper");
 
 router.use('/history/:roomId', passport.authenticate('jwt', {session: false}), async (req, res, next) => {
 
-    let decoded = jwt.verify(req.headers.authorization.split(' ')[1], keys.jwt);
-    console.log(decoded)
-    next()
+  let decoded = jwt.verify(req.headers.authorization.split(' ')[1], keys.jwt);
+  console.log(decoded)
+  next()
 })
 
 router.get("/history/:roomId", catchWrap(async (req, res) => {
-    // const {password, userName} = req.body;
-const roomId = req.params.roomId;
+  // const {password, userName} = req.body;
+  const roomId = req.params.roomId;
 
-    const history = await History.findOne({
-        where: {
-            roomid: roomId
-        }
-    })
-    res.json(history);
+  const history = await History.findOne({
+    where: {
+      roomid: roomId
+    }
+  })
+  res.json(history);
 }))
 
 module.exports = router;

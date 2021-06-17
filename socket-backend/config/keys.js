@@ -1,3 +1,3 @@
 module.exports = {
-    jwt: 'dev-jwt'
+  jwt: 'dev-jwt'
 }

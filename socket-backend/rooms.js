@@ -1,33 +1,33 @@
 class Rooms {
-    constructor() {
-        this.rooms = []
-    }
+  constructor() {
+    this.rooms = []
+  }
 
-    add(room) {
-        this.rooms.push(room)
-    }
+  add(room) {
+    this.rooms.push(room)
+  }
 
-    get(id) {
-        return this.rooms.find(room => room.id === id)
-    }
+  get(id) {
+    return this.rooms.find(room => room.id === id)
+  }
 
-    getAllRooms() {
-        return this.rooms;
-    }
+  getAllRooms() {
+    return this.rooms;
+  }
 
-    remove(id) {
-        const room = this.get(id);
-        if (room) {
-            this.rooms = this.rooms.filter(room => room.id !== id);
-        }
-        return room;
+  remove(id) {
+    const room = this.get(id);
+    if (room) {
+      this.rooms = this.rooms.filter(room => room.id !== id);
     }
+    return room;
+  }
 
-    // getByRoom(room) {
-    //     return this.users.filter(user => user.room === room);
-    // }
+  // getByRoom(room) {
+  //     return this.users.filter(user => user.room === room);
+  // }
 }
 
 module.exports = function () {
-    return new Rooms();
+  return new Rooms();
 }

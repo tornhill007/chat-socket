@@ -30,6 +30,7 @@ export const setAuthUserData = (userId, userName, token) => ({
 export const login = (password, userName) => async (dispatch) => {
     try {
         let response = await authAPI.login(password, userName);
+        console.log(response);
         if (response.statusText === 'OK') {
             dispatch(reset('register'))
             let {userId, userName, token} = response.data;
@@ -44,10 +45,12 @@ export const login = (password, userName) => async (dispatch) => {
         }
         else {
             let message = response.data.messages.length > 0 ? response.data.messages[0] : "Some error";
+            // alert(message)
         }
     }
     catch (err) {
-        console.log(err);
+        alert(err.response.data.message)
+        console.log("err", err.response.data.message);
     }
 
 };
@@ -69,7 +72,7 @@ export const register = (password, userName, repeatPassword) => async (dispatch)
         }
 
     } catch (err) {
-        alert(err);
+        alert(err.response.data.message);
     }
 
 };
