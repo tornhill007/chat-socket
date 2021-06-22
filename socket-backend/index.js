@@ -3,10 +3,10 @@ const app = express();
 const cors = require("cors");
 const httpServer = require("http").createServer(app);
 const options = { /* ... */};
-const usersInstance = require('./users')();
-const usersTmp = require('./usersTmp')();
-const roomsInstance = require('./rooms')();
-const connectedUsers = require('./connectedUsers')();
+const usersInstance = require('./store')();
+const usersTmpInstance = require('./store')();
+const roomsInstance = require('./store')();
+const connectedUsers = require('./store')();
 const passport = require("passport");
 const sequelize = require('./config/database')
 const generateUID = require('./common/generateUID')
@@ -126,12 +126,12 @@ io.on("connection", async (socket) => {
 
   socket.on("users/left", async (callback) => {
 
-    const connectedUser = connectedUsers.get(socket.id);
+    const connectedUser = connectedUsers.getBySocketId(socket.id);
     if (connectedUser) {
 
-      let removedConnectedUser = connectedUsers.remove(socket.id)
-      let removedUser = usersTmp.remove(removedConnectedUser.userId, removedConnectedUser.socketId);
-      let usersInRoom = usersTmp.getByRoom(removedUser.room);
+      let removedConnectedUser = connectedUsers.removeConnectedUserById(socket.id)
+      let removedUser = usersTmpInstance.remove(removedConnectedUser.userId, removedConnectedUser.socketId);
+      let usersInRoom = usersTmpInstance.getByRoom(removedUser.room);
       let isUserInRoom = usersInRoom.find(item => item.id === removedUser.id);
 
       if(usersInRoom.length !== 0) {
@@ -182,13 +182,13 @@ io.on("connection", async (socket) => {
         await history.save();
 
 
-        roomsInstance.remove(removedUser.room);
+        roomsInstance.removeByRoomId(removedUser.room);
 
         let userInRoom = usersInstance.getByRoom(removedUser.room);
-        let tmp = usersTmp.getByRoom(removedUser.room)
+        let tmp = usersTmpInstance.getByRoom(removedUser.room)
         if (!tmp || tmp.length === 0) {
 
-          let createdRooms = roomsInstance.getAllRooms();
+          let createdRooms = roomsInstance.getAll();
           io.emit("rooms/getAll", createdRooms);
           let history = await History.findOne({
             where: {
@@ -199,64 +199,14 @@ io.on("connection", async (socket) => {
         }
       }
     }
-
     callback()
-
-
-
-    // console.log(usersInstance);
-    // let decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
-    // let userInfo = await Users.getUserByUserId(decoded.userId);
-    // const connectedUser = connectedUsers.get(socket.id);
-    // if (userInfo) {
-    //   if (userInfo.userid === decoded.userId) {
-    //     let removedConnectedUser = connectedUsers.remove(socket.id)
-    //     let removedUser = usersTmp.remove(connectedUser.userId, socket.id);
-    //     console.log(usersInstance);
-    //     let isUserInRoom;
-    //     let usersInRoom = usersTmp.getByRoom(removedUser.room)
-    //     isUserInRoom = usersInRoom.find(item => item.id === connectedUser.userId);
-    //     let user;
-    //     if (!isUserInRoom) {
-    //       user = usersInstance.removeById(removedUser.id)[0];
-    //       if (user) {
-    //         io.to(user.room).emit('messages/new', m("admin", `User ${user.name} left`));
-    //
-    //         let history = await History.findOne({
-    //           where: {
-    //             roomid: user.room
-    //           }
-    //         });
-    //         const cloneHistory = JSON.parse(JSON.stringify(history.history));
-    //         cloneHistory.push({name: 'admin', text: `User ${user.name} left`});
-    //         history.history = cloneHistory;
-    //         await history.save();
-    //         io.to(user.room).emit("users/update", usersInstance.getByRoom(user.room));
-    //         let userInRoom = usersInstance.getByRoom(user.room);
-    //         if (!userInRoom || userInRoom.length === 0) {
-    //           roomsInstance.remove(user.room);
-    //           let createdRooms = roomsInstance.getAllRooms();
-    //           io.emit("rooms/getAll", createdRooms)
-    //           let history = await History.findOne({
-    //             where: {
-    //               roomid: user.room
-    //             }
-    //           });
-    //           await history.destroy();
-    //         }
-    //       }
-    //     }
-    //     callback();
-    //   }
-    // }
   })
 
   socket.on("rooms/get", (data, callback) => {
-    let createdRooms = roomsInstance.getAllRooms();
+    let createdRooms = roomsInstance.getAll();
     socket.emit("rooms/getAll", createdRooms)
     callback();
   })
-
   socket.on("users/joined", async (data, callback) => {
     if (!data) {
       return callback("Incorrect data")
@@ -276,7 +226,7 @@ io.on("connection", async (socket) => {
 
     socket.join(roomId);
 
-    usersTmp.add({
+    usersTmpInstance.add({
       id: user.userid,
       name: user.username,
       room: roomId,
@@ -296,7 +246,7 @@ io.on("connection", async (socket) => {
           socketId: socket.id
         })
 
-        let room = roomsInstance.get(roomId);
+        let room = roomsInstance.getById(roomId);
         if (!room) {
           data.room.id = roomId
           roomsInstance.add(data.room);
@@ -325,7 +275,7 @@ io.on("connection", async (socket) => {
           history.history = cloneHistory;
         }
 
-        let createdRooms = roomsInstance.getAllRooms();
+        let createdRooms = roomsInstance.getAll();
 
         io.emit("rooms/getAll", createdRooms)
 
@@ -349,12 +299,12 @@ io.on("connection", async (socket) => {
 
   socket.on('disconnect', async (data) => {
     console.log("correct disconnection")
-    const connectedUser = connectedUsers.get(socket.id);
+    const connectedUser = connectedUsers.getBySocketId(socket.id);
     if (connectedUser) {
 
-      let removedConnectedUser = connectedUsers.remove(socket.id)
-      let removedUser = usersTmp.remove(removedConnectedUser.userId, removedConnectedUser.socketId);
-      let usersInRoom = usersTmp.getByRoom(removedUser.room);
+      let removedConnectedUser = connectedUsers.removeConnectedUserById(socket.id)
+      let removedUser = usersTmpInstance.remove(removedConnectedUser.userId, removedConnectedUser.socketId);
+      let usersInRoom = usersTmpInstance.getByRoom(removedUser.room);
       let isUserInRoom = usersInRoom.find(item => item.id === removedUser.id);
 
       if(usersInRoom.length !== 0) {
@@ -405,13 +355,13 @@ io.on("connection", async (socket) => {
         await history.save();
 
 
-        roomsInstance.remove(removedUser.room);
+        roomsInstance.removeByRoomId(removedUser.room);
 
         let userInRoom = usersInstance.getByRoom(removedUser.room);
-        let tmp = usersTmp.getByRoom(removedUser.room)
+        let tmp = usersTmpInstance.getByRoom(removedUser.room)
         if (!tmp || tmp.length === 0) {
 
-          let createdRooms = roomsInstance.getAllRooms();
+          let createdRooms = roomsInstance.getAll();
           io.emit("rooms/getAll", createdRooms);
           let history = await History.findOne({
             where: {
@@ -487,9 +437,9 @@ io.on("connection", async (socket) => {
     }
 
     // const user = usersInstance.get(userInfo.userid, socket.id);
-    let user = usersTmp.getAllById(userInfo.userid);
+    let user = usersTmpInstance.getAllById(userInfo.userid);
     if (user.length > 1) {
-      user = usersTmp.get(userInfo.userid, socket.id);
+      user = usersTmpInstance.get(userInfo.userid, socket.id);
     }
 
     if (user) {
