@@ -2,7 +2,7 @@ const {Sequelize, DataTypes} = require('sequelize');
 const db = require('../config/database');
 
 
-const History = db.define('history', {
+const History = db.define('historytmp', {
     id: {
       type: DataTypes.UUID,
       autoIncrement: true,
@@ -13,15 +13,19 @@ const History = db.define('history', {
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    userid: {
+      type: DataTypes.INTEGER,
+    },
     history: {
       type: DataTypes.JSON,
       allowNull: false
     },
   },
   {
-    timestamps: false,
-    tableName: 'history',
-
+    createdAt   : 'createdat',
+    updatedAt   : 'updatedat',
+    timestamps: true,
+    tableName: 'historytmp',
   })
 
 History.getHistoryByRoomId = function (roomid) {

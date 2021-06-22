@@ -154,9 +154,9 @@ export const resetRoomHistory = () => ({
 export const getRoomHistory = (roomId, userName) => async (dispatch) => {
     try {
         let response = await historyApi.getRoomHistory(roomId);
-
+        let modifiedResponse = response.data.map(item => item.history);
         console.log('[HISTORY]', response)
-        dispatch(setRoomHistory(response.data.history, userName))
+        dispatch(setRoomHistory(modifiedResponse, userName))
     } catch (err) {
         console.log(err);
     }

@@ -6,7 +6,8 @@ const options = { /* ... */};
 const usersInstance = require('./store')();
 const usersTmpInstance = require('./store')();
 const roomsInstance = require('./store')();
-const connectedUsers = require('./store')();
+const connectedUsersInstance = require('./store')();
+const exitFromRoom = require('./common/exitFromRoom');
 const passport = require("passport");
 const sequelize = require('./config/database')
 const generateUID = require('./common/generateUID')
@@ -42,7 +43,6 @@ const io = require("socket.io")(httpServer, {
   }
 });
 
-let connections = [];
 
 const m = (name, text, id) => ({name, text, id})
 
@@ -103,9 +103,6 @@ const m = (name, text, id) => ({name, text, id})
 // }
 
 io.on("connection", async (socket) => {
-  connections.push(socket);
-  console.log(socket.handshake.query.loggeduser);
-
   // chatHandlers(socket)
   // roomHandlers(socket)
   // adminHandlers(socket)
@@ -117,88 +114,14 @@ io.on("connection", async (socket) => {
     let decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
     let user = await Users.getUserByUserId(decoded.userId);
     if (user) {
-      if (user.userid === decoded.userId) {
-        connectedUsers.add({socketId: socket.id, userId: user.userid})
-        console.log("correct connection")
-      }
+      socket.user = user;
+      connectedUsersInstance.add({socketId: socket.id, userId: user.userid})
+      console.log("correct connection")
     }
   }
 
   socket.on("users/left", async (callback) => {
-
-    const connectedUser = connectedUsers.getBySocketId(socket.id);
-    if (connectedUser) {
-
-      let removedConnectedUser = connectedUsers.removeConnectedUserById(socket.id)
-      let removedUser = usersTmpInstance.remove(removedConnectedUser.userId, removedConnectedUser.socketId);
-      let usersInRoom = usersTmpInstance.getByRoom(removedUser.room);
-      let isUserInRoom = usersInRoom.find(item => item.id === removedUser.id);
-
-      if(usersInRoom.length !== 0) {
-        let currentUserInRoom = usersInstance.getByRoom(removedUser.room);
-        let result = currentUserInRoom.find(item => item.id === removedUser.id);
-        if(!result) {
-          usersInstance.remove(removedUser.id, removedUser.socketId);
-          io.to(removedUser.room).emit("users/update", usersInstance.getByRoom(removedUser.room));
-          io.to(removedUser.room).emit("messages/new", m("admin", `User ${removedUser.name} left`))
-          let history = await History.findOne({
-            where: {
-              roomid: removedUser.room
-            }
-          });
-          const cloneHistory = JSON.parse(JSON.stringify(history.history));
-          cloneHistory.push({name: 'admin', text: `User ${removedUser.name} left`});
-          history.history = cloneHistory;
-          await history.save();
-
-        }
-        else if(!isUserInRoom){
-          usersInstance.remove(result.id, result.socketId);
-          io.to(result.room).emit("users/update", usersInstance.getByRoom(result.room));
-          io.to(result.room).emit("messages/new", m("admin", `User ${result.name} left`))
-          let history = await History.findOne({
-            where: {
-              roomid: result.room
-            }
-          });
-          const cloneHistory = JSON.parse(JSON.stringify(history.history));
-          cloneHistory.push({name: 'admin', text: `User ${result.name} left`});
-          history.history = cloneHistory;
-          await history.save();
-        }
-      }
-
-      else {
-        io.to(removedUser.room).emit("users/update", usersInstance.getByRoom(removedUser.room));
-        io.to(removedUser.room).emit("messages/new", m("admin", `User ${removedUser.name} left`))
-        let history = await History.findOne({
-          where: {
-            roomid: removedUser.room
-          }
-        });
-        const cloneHistory = JSON.parse(JSON.stringify(history.history));
-        cloneHistory.push({name: 'admin', text: `User ${removedUser.name} left`});
-        history.history = cloneHistory;
-        await history.save();
-
-
-        roomsInstance.removeByRoomId(removedUser.room);
-
-        let userInRoom = usersInstance.getByRoom(removedUser.room);
-        let tmp = usersTmpInstance.getByRoom(removedUser.room)
-        if (!tmp || tmp.length === 0) {
-
-          let createdRooms = roomsInstance.getAll();
-          io.emit("rooms/getAll", createdRooms);
-          let history = await History.findOne({
-            where: {
-              roomid: removedUser.room
-            }
-          });
-          await history.destroy();
-        }
-      }
-    }
+    await exitFromRoom(socket.id, io, m, usersTmpInstance, usersInstance, connectedUsersInstance, roomsInstance);
     callback()
   })
 
@@ -207,6 +130,7 @@ io.on("connection", async (socket) => {
     socket.emit("rooms/getAll", createdRooms)
     callback();
   })
+
   socket.on("users/joined", async (data, callback) => {
     if (!data) {
       return callback("Incorrect data")
@@ -220,8 +144,7 @@ io.on("connection", async (socket) => {
       socket.emit('rooms/generateId', roomId);
     }
 
-    let decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
-    let user = await Users.getUserByUserId(decoded.userId);
+    let user = socket.user;
     let usersInRoom = usersInstance.getByRoom(roomId);
 
     socket.join(roomId);
@@ -235,62 +158,66 @@ io.on("connection", async (socket) => {
 
     let isUserInRoom = usersInRoom.find(item => item.id === user.userid)
 
-    if (user && !isUserInRoom) {
+    if (!isUserInRoom) {
 
-      if (user.userid === decoded.userId) {
-        // users.remove(user.userid);
-        usersInstance.add({
-          id: user.userid,
-          name: user.username,
-          room: roomId,
-          socketId: socket.id
-        })
+      // users.remove(user.userid);
+      usersInstance.add({
+        id: user.userid,
+        name: user.username,
+        room: roomId,
+        socketId: socket.id
+      })
 
-        let room = roomsInstance.getById(roomId);
-        if (!room) {
-          data.room.id = roomId
-          roomsInstance.add(data.room);
-        }
-
-        callback({userId: user.userid})
-
-        socket.emit('messages/new', m('admin', `Welcome, ${user.username}`));
-        console.log(socket.handshake.query.loggeduser);
-        let history;
-        let cloneHistory;
-        history = await History.findOne({
-          where: {
-            roomid: roomId
-          }
-        });
-
-        if (!history) {
-          history = History.build({
-            roomid: roomId,
-            history: [{name: 'admin', text: `Welcome, ${user.username}`}]
-          })
-        } else {
-          cloneHistory = JSON.parse(JSON.stringify(history.history));
-          cloneHistory.push({name: 'admin', text: `Welcome, ${user.username}`})
-          history.history = cloneHistory;
-        }
-
-        let createdRooms = roomsInstance.getAll();
-
-        io.emit("rooms/getAll", createdRooms)
-
-        socket.broadcast.to(roomId).emit('messages/new', m('admin', `User ${user.username} joined`))
-
-        if (cloneHistory) {
-          cloneHistory.push({name: 'admin', text: `User ${user.username} joined`})
-          history.history = cloneHistory;
-        } else {
-          cloneHistory = JSON.parse(JSON.stringify(history.history));
-          cloneHistory.push({name: 'admin', text: `User ${user.username} joined`})
-          history.history = cloneHistory;
-        }
-        await history.save();
+      let room = roomsInstance.getById(roomId);
+      if (!room) {
+        data.room.id = roomId
+        roomsInstance.add(data.room);
       }
+
+      callback({userId: user.userid})
+
+      socket.emit('messages/new', m('admin', `Welcome, ${user.username}`));
+      console.log(socket.handshake.query.loggeduser);
+      let history;
+      let cloneHistory;
+      // history = await History.findOne({
+      //   where: {
+      //     roomid: roomId
+      //   }
+      // });
+
+      let newRecord = History.build({
+        roomid: roomId,
+        history: {name: 'admin', text: `Welcome, ${user.username}`},
+      })
+      await newRecord.save();
+
+      // cloneHistory = JSON.parse(JSON.stringify(history.history));
+      // cloneHistory.push({name: 'admin', text: `Welcome, ${user.username}`})
+      // history.history = cloneHistory;
+
+
+      let createdRooms = roomsInstance.getAll();
+
+      io.emit("rooms/getAll", createdRooms)
+
+      socket.broadcast.to(roomId).emit('messages/new', m('admin', `User ${user.username} joined`))
+
+      let newMessage = History.build({
+        roomid: roomId,
+        history: {name: 'admin', text: `User ${user.username} joined`}
+      })
+      //
+      // if (cloneHistory) {
+      //   cloneHistory.push({name: 'admin', text: `User ${user.username} joined`})
+      //   history.history = cloneHistory;
+      // } else {
+      //   cloneHistory = JSON.parse(JSON.stringify(history.history));
+      //   cloneHistory.push({name: 'admin', text: `User ${user.username} joined`})
+      //
+      // }
+      // await newRecord.save();
+      await newMessage.save();
     } else {
       socket.emit('messages/new', m('admin', false));
     }
@@ -299,126 +226,7 @@ io.on("connection", async (socket) => {
 
   socket.on('disconnect', async (data) => {
     console.log("correct disconnection")
-    const connectedUser = connectedUsers.getBySocketId(socket.id);
-    if (connectedUser) {
-
-      let removedConnectedUser = connectedUsers.removeConnectedUserById(socket.id)
-      let removedUser = usersTmpInstance.remove(removedConnectedUser.userId, removedConnectedUser.socketId);
-      let usersInRoom = usersTmpInstance.getByRoom(removedUser.room);
-      let isUserInRoom = usersInRoom.find(item => item.id === removedUser.id);
-
-      if(usersInRoom.length !== 0) {
-        let currentUserInRoom = usersInstance.getByRoom(removedUser.room);
-        let result = currentUserInRoom.find(item => item.id === removedUser.id);
-        if(!result) {
-          usersInstance.remove(removedUser.id, removedUser.socketId);
-          io.to(removedUser.room).emit("users/update", usersInstance.getByRoom(removedUser.room));
-          io.to(removedUser.room).emit("messages/new", m("admin", `User ${removedUser.name} left`))
-          let history = await History.findOne({
-            where: {
-              roomid: removedUser.room
-            }
-          });
-          const cloneHistory = JSON.parse(JSON.stringify(history.history));
-          cloneHistory.push({name: 'admin', text: `User ${removedUser.name} left`});
-          history.history = cloneHistory;
-          await history.save();
-
-        }
-        else if(!isUserInRoom){
-          usersInstance.remove(result.id, result.socketId);
-          io.to(result.room).emit("users/update", usersInstance.getByRoom(result.room));
-          io.to(result.room).emit("messages/new", m("admin", `User ${result.name} left`))
-          let history = await History.findOne({
-            where: {
-              roomid: result.room
-            }
-          });
-          const cloneHistory = JSON.parse(JSON.stringify(history.history));
-          cloneHistory.push({name: 'admin', text: `User ${result.name} left`});
-          history.history = cloneHistory;
-          await history.save();
-        }
-      }
-
-      else {
-        io.to(removedUser.room).emit("users/update", usersInstance.getByRoom(removedUser.room));
-        io.to(removedUser.room).emit("messages/new", m("admin", `User ${removedUser.name} left`))
-        let history = await History.findOne({
-          where: {
-            roomid: removedUser.room
-          }
-        });
-        const cloneHistory = JSON.parse(JSON.stringify(history.history));
-        cloneHistory.push({name: 'admin', text: `User ${removedUser.name} left`});
-        history.history = cloneHistory;
-        await history.save();
-
-
-        roomsInstance.removeByRoomId(removedUser.room);
-
-        let userInRoom = usersInstance.getByRoom(removedUser.room);
-        let tmp = usersTmpInstance.getByRoom(removedUser.room)
-        if (!tmp || tmp.length === 0) {
-
-          let createdRooms = roomsInstance.getAll();
-          io.emit("rooms/getAll", createdRooms);
-          let history = await History.findOne({
-            where: {
-              roomid: removedUser.room
-            }
-          });
-          await history.destroy();
-        }
-      }
-    }
-      // // console.log(usersInstance);
-      // let usersInRoom = usersTmp.getByRoom(removedUser.room);
-      // let isUserInRoom = usersInRoom.find(item => item.id === removedUser.id);
-      // let user;
-
-      // if(!usersInRoom || usersInRoom.length === 0)
-      // let isUserInRoom;
-
-      // let usersInRoom;
-      // let user;
-
-      // isUserInRoom = usersInRoom.find(item => item.id === connectedUser.userId);
-
-      // if (!isUserInRoom) {
-      //
-      //   // let checkUsersInRoom = usersInstance.getByRoom(removedUser.room);
-      //   // let checkedUsersInRoom = checkUsersInRoom.filter(item => item.id === removedUser.id);
-      //   // if(checkedUsersInRoom.length > 0) {
-      //   //   user = usersInstance.removeById(connectedUser.userId)[0];
-      //   // }
-      //   // else {
-      //   //   user = usersInstance.remove(connectedUser.userId, socket.id);
-      //   // }
-      //   user = usersInstance.removeByIndexAndSocketId(connectedUser.userId, connectedUser.socketId);
-      //   if (Array.isArray(user)) {
-      //     user = user[0]
-      //   }
-      // }
-
-
-      // if(removedUser) {
-      //   let usersInRoom = usersTmp.getByRoom(removedUser.room)
-      //   isUserInRoom = usersInRoom.find(item => item.id === connectedUser.userId);
-      //   console.log(isUserInRoom)
-      // }
-      // let usersInRoom = usersTmp.getByRoom(removedUser.room)
-      // let isUserInRoom = usersInRoom.find(item => item.id === connectedUser.userId);
-      // if (!isUserInRoom) {
-      //   user = usersInstance.removeByIndexAndSocketId(removedConnectedUser.userId, removedConnectedUser.socketId);
-      // }
-      // // user = usersInstance.remove(connectedUser.userId, socket.id);
-      // if (user) {
-
-        // user = user[0]
-
-
-
+    await exitFromRoom(socket.id, io, m, usersTmpInstance, usersInstance, connectedUsersInstance, roomsInstance);
   })
 
   socket.on("createMessage", async (data, callback) => {
@@ -427,13 +235,12 @@ io.on("connection", async (socket) => {
       return callback('Incorrect data');
     }
     console.log(socket.id)
-    let decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
-    let userAuth = await Users.getUserByUserId(decoded.userId);
+    // let decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
+    // let userAuth = await Users.getUserByUserId(decoded.userId);
+    let userAuth = socket.user
     let userInfo;
     if (userAuth) {
-      if (userAuth.userid === decoded.userId) {
-        userInfo = userAuth;
-      }
+      userInfo = userAuth;
     }
 
     // const user = usersInstance.get(userInfo.userid, socket.id);
@@ -445,15 +252,21 @@ io.on("connection", async (socket) => {
     if (user) {
 
       io.to(Array.isArray(user) ? user[0].room : user.room).emit('messages/new', m(Array.isArray(user) ? user[0].name : user.name, data.message, userInfo.userid))
-      let history = await History.findOne({
-        where: {
-          roomid: Array.isArray(user) ? user[0].room : user.room
-        }
-      });
-      const cloneHistory = JSON.parse(JSON.stringify(history.history));
-      cloneHistory.push({name: `${Array.isArray(user) ? user[0].name : user.name}`, text: `${data.message}`});
-      history.history = cloneHistory;
-      await history.save();
+      // let history = await History.findOne({
+      //   where: {
+      //     roomid: Array.isArray(user) ? user[0].room : user.room
+      //   }
+      // });
+      // const cloneHistory = JSON.parse(JSON.stringify(history.history));
+      // cloneHistory.push({name: `${Array.isArray(user) ? user[0].name : user.name}`, text: `${data.message}`});
+      // history.history = cloneHistory;
+      let newMessage = History.build({
+        roomid: Array.isArray(user) ? user[0].room : user.room,
+        userid: userInfo.userid,
+        history: {name: `${Array.isArray(user) ? user[0].name : user.name}`, text: `${data.message}`}
+      })
+
+      await newMessage.save();
     }
     callback();
   })

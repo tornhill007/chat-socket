@@ -20,7 +20,7 @@ router.get("/history/:roomId", catchWrap(async (req, res) => {
   // const {password, userName} = req.body;
   const roomId = req.params.roomId;
 
-  const history = await History.findOne({
+  const history = await History.findAll({
     where: {
       roomid: roomId
     }
