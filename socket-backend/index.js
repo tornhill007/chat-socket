@@ -208,17 +208,13 @@ io.on("connection", async (socket) => {
     }
     let userInfo = socket.user
 
-    let user = usersTmpInstance.getAllById(userInfo.userid);
-    if (user.length > 1) {
-      user = usersTmpInstance.get(userInfo.userid, socket.id);
-    }
+    let user = usersTmpInstance.get(userInfo.userid, socket.id);
 
-    
     if (user) {
-      io.to(Array.isArray(user) ? user[0].room : user.room).emit('messages/new', m(Array.isArray(user) ? user[0].name : user.name, data.message, userInfo.userid))
+      io.to(user.room).emit('messages/new', m(user.name, data.message, userInfo.userid))
 
-      await buildNewRecord(Array.isArray(user) ? user[0].room : user.room, userInfo.userid, {
-        name: `${Array.isArray(user) ? user[0].name : user.name}`,
+      await buildNewRecord(user.room, userInfo.userid, {
+        name: `${user.name}`,
         text: `${data.message}`
       })
     }
