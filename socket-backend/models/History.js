@@ -28,6 +28,14 @@ const History = db.define('historytmp', {
     tableName: 'historytmp',
   })
 
+History.buildNewRecord = function (roomid, userid, history) {
+  return this.build({
+    roomid,
+    userid,
+    history
+  });
+}
+
 History.getHistoryByRoomId = function (roomid) {
   return this.findOne({
     where: {
@@ -42,6 +50,8 @@ History.buildNewHistory = (roomid, history) => {
     history
   })
 }
+
+
 
 
 module.exports = History;
