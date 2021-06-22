@@ -125,51 +125,130 @@ io.on("connection", async (socket) => {
   }
 
   socket.on("users/left", async (callback) => {
-    console.log(usersInstance);
-    let decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
-    let userInfo = await Users.getUserByUserId(decoded.userId);
-    const connectedUser = connectedUsers.get(socket.id);
-    if (userInfo) {
-      if (userInfo.userid === decoded.userId) {
-        let removedConnectedUser = connectedUsers.remove(socket.id)
-        let removedUser = usersTmp.remove(connectedUser.userId, socket.id);
-        console.log(usersInstance);
-        let isUserInRoom;
-        let usersInRoom = usersTmp.getByRoom(removedUser.room)
-        isUserInRoom = usersInRoom.find(item => item.id === connectedUser.userId);
-        let user;
-        if (!isUserInRoom) {
-          user = usersInstance.removeById(removedUser.id)[0];
-          if (user) {
-            io.to(user.room).emit('messages/new', m("admin", `User ${user.name} left`));
 
-            let history = await History.findOne({
-              where: {
-                roomid: user.room
-              }
-            });
-            const cloneHistory = JSON.parse(JSON.stringify(history.history));
-            cloneHistory.push({name: 'admin', text: `User ${user.name} left`});
-            history.history = cloneHistory;
-            await history.save();
-            io.to(user.room).emit("users/update", usersInstance.getByRoom(user.room));
-            let userInRoom = usersInstance.getByRoom(user.room);
-            if (!userInRoom || userInRoom.length === 0) {
-              roomsInstance.remove(user.room);
-              let createdRooms = roomsInstance.getAllRooms();
-              io.emit("rooms/getAll", createdRooms)
-              let history = await History.findOne({
-                where: {
-                  roomid: user.room
-                }
-              });
-              await history.destroy();
+    const connectedUser = connectedUsers.get(socket.id);
+    if (connectedUser) {
+
+      let removedConnectedUser = connectedUsers.remove(socket.id)
+      let removedUser = usersTmp.remove(removedConnectedUser.userId, removedConnectedUser.socketId);
+      let usersInRoom = usersTmp.getByRoom(removedUser.room);
+      let isUserInRoom = usersInRoom.find(item => item.id === removedUser.id);
+
+      if(usersInRoom.length !== 0) {
+        let currentUserInRoom = usersInstance.getByRoom(removedUser.room);
+        let result = currentUserInRoom.find(item => item.id === removedUser.id);
+        if(!result) {
+          usersInstance.remove(removedUser.id, removedUser.socketId);
+          io.to(removedUser.room).emit("users/update", usersInstance.getByRoom(removedUser.room));
+          io.to(removedUser.room).emit("messages/new", m("admin", `User ${removedUser.name} left`))
+          let history = await History.findOne({
+            where: {
+              roomid: removedUser.room
             }
-          }
+          });
+          const cloneHistory = JSON.parse(JSON.stringify(history.history));
+          cloneHistory.push({name: 'admin', text: `User ${removedUser.name} left`});
+          history.history = cloneHistory;
+          await history.save();
+
         }
-        callback();
+        else if(!isUserInRoom){
+          usersInstance.remove(result.id, result.socketId);
+          io.to(result.room).emit("users/update", usersInstance.getByRoom(result.room));
+          io.to(result.room).emit("messages/new", m("admin", `User ${result.name} left`))
+          let history = await History.findOne({
+            where: {
+              roomid: result.room
+            }
+          });
+          const cloneHistory = JSON.parse(JSON.stringify(history.history));
+          cloneHistory.push({name: 'admin', text: `User ${result.name} left`});
+          history.history = cloneHistory;
+          await history.save();
+        }
+      }
+
+      else {
+        io.to(removedUser.room).emit("users/update", usersInstance.getByRoom(removedUser.room));
+        io.to(removedUser.room).emit("messages/new", m("admin", `User ${removedUser.name} left`))
+        let history = await History.findOne({
+          where: {
+            roomid: removedUser.room
+          }
+        });
+        const cloneHistory = JSON.parse(JSON.stringify(history.history));
+        cloneHistory.push({name: 'admin', text: `User ${removedUser.name} left`});
+        history.history = cloneHistory;
+        await history.save();
+
+
+        roomsInstance.remove(removedUser.room);
+
+        let userInRoom = usersInstance.getByRoom(removedUser.room);
+        let tmp = usersTmp.getByRoom(removedUser.room)
+        if (!tmp || tmp.length === 0) {
+
+          let createdRooms = roomsInstance.getAllRooms();
+          io.emit("rooms/getAll", createdRooms);
+          let history = await History.findOne({
+            where: {
+              roomid: removedUser.room
+            }
+          });
+          await history.destroy();
+        }
       }
     }
+
+    callback()
+
+
+
+    // console.log(usersInstance);
+    // let decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
+    // let userInfo = await Users.getUserByUserId(decoded.userId);
+    // const connectedUser = connectedUsers.get(socket.id);
+    // if (userInfo) {
+    //   if (userInfo.userid === decoded.userId) {
+    //     let removedConnectedUser = connectedUsers.remove(socket.id)
+    //     let removedUser = usersTmp.remove(connectedUser.userId, socket.id);
+    //     console.log(usersInstance);
+    //     let isUserInRoom;
+    //     let usersInRoom = usersTmp.getByRoom(removedUser.room)
+    //     isUserInRoom = usersInRoom.find(item => item.id === connectedUser.userId);
+    //     let user;
+    //     if (!isUserInRoom) {
+    //       user = usersInstance.removeById(removedUser.id)[0];
+    //       if (user) {
+    //         io.to(user.room).emit('messages/new', m("admin", `User ${user.name} left`));
+    //
+    //         let history = await History.findOne({
+    //           where: {
+    //             roomid: user.room
+    //           }
+    //         });
+    //         const cloneHistory = JSON.parse(JSON.stringify(history.history));
+    //         cloneHistory.push({name: 'admin', text: `User ${user.name} left`});
+    //         history.history = cloneHistory;
+    //         await history.save();
+    //         io.to(user.room).emit("users/update", usersInstance.getByRoom(user.room));
+    //         let userInRoom = usersInstance.getByRoom(user.room);
+    //         if (!userInRoom || userInRoom.length === 0) {
+    //           roomsInstance.remove(user.room);
+    //           let createdRooms = roomsInstance.getAllRooms();
+    //           io.emit("rooms/getAll", createdRooms)
+    //           let history = await History.findOne({
+    //             where: {
+    //               roomid: user.room
+    //             }
+    //           });
+    //           await history.destroy();
+    //         }
+    //       }
+    //     }
+    //     callback();
+    //   }
+    // }
   })
 
   socket.on("rooms/get", (data, callback) => {
