@@ -116,7 +116,7 @@ io.on("connection", async (socket) => {
     let user = await Users.getUserByUserId(decoded.userId);
     if (user) {
       socket.user = user;
-      connectedUsersInstance.add({socketId: socket.id, userId: user.userid})
+      connectedUsersInstance.add({socketId: socket.id, userId: user.userid, token: socket.handshake.query.loggeduser.substr(-4)})
       console.log("correct connection")
     }
   }
@@ -154,7 +154,8 @@ io.on("connection", async (socket) => {
       id: user.userid,
       name: user.username,
       room: roomId,
-      socketId: socket.id
+      socketId: socket.id,
+      token: socket.handshake.query.loggeduser.substr(-4)
     })
 
     let isUserInRoom = usersInRoom.find(item => item.id === user.userid)
@@ -169,7 +170,8 @@ io.on("connection", async (socket) => {
       id: user.userid,
       name: user.username,
       room: roomId,
-      socketId: socket.id
+      socketId: socket.id,
+      token: socket.handshake.query.loggeduser.substr(-4)
     })
 
     let room = roomsInstance.getById(roomId);
