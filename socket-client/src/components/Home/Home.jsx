@@ -68,7 +68,7 @@ class Home extends React.Component {
         // if(!this.props.isMounted) {
             console.log("OLAOLALOLAOAL")
             // let token = JSON.parse(localStorage.getItem('user')).token;
-            socket = io('http://192.168.1.229:8080/', {query: `loggeduser=${this.props.token}`});
+            socket = io('http://192.168.1.229:8080/', {query: {tabId: JSON.parse(sessionStorage.getItem('tabId')), loggeduser: this.props.token}});
             // socket.connect();
             socket.emit("rooms/get", {}, (data) => {
             })
@@ -167,8 +167,8 @@ class Home extends React.Component {
                 <div>
                     ROOMS LIST
                     {this.props.rooms.map((item, index) => {
-                        return <NavLink key={index} onClick={() => {this.props.setInRoom(true); this.onCreateRoom(item.id)}} to={`/game/${item.id}`}><div>
-                            {item.name}
+                        return <NavLink key={index} onClick={() => {this.props.setInRoom(true); this.onCreateRoom(item.roomid)}} to={`/game/${item.roomid}`}><div>
+                            {item.roomname}
                         </div>
                         </NavLink>
                     })}

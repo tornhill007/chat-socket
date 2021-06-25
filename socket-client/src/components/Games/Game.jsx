@@ -153,7 +153,7 @@ class Home extends React.Component {
     }
 
     render() {
-        console.log(this.state.user)
+        console.log("[USERSS]", this.props.users)
         console.log("[roomHistory]", this.props.roomHistory)
         console.log('[allMsg]', this.state.allMsg)
         if(this.props.inRoom === false || this.props.inRoom === null) {
@@ -195,7 +195,7 @@ class Home extends React.Component {
                     </div>
                     <div>
                     {this.props.users.map((item, index) => {
-                        return <div key={index}>{item.name}</div>
+                        return <div key={index}>{item.username}</div>
                     })}
                     </div>
                 </div>

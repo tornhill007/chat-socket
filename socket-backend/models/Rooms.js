@@ -1,5 +1,6 @@
 const {Sequelize, DataTypes} = require('sequelize');
 const db = require('../config/database');
+const Tabs = require('../models/Tabs');
 
 // CREATE TABLE rooms (
 //   id serial NOT NULL PRIMARY KEY,
@@ -9,21 +10,41 @@ const db = require('../config/database');
 //   updatedat timestamp NOT NULL
 // );
 
+//
+// roomid: {
+//   type: DataTypes.STRING,
+//     primaryKey: true,
+//     allowNull: false
+// },
+// roomname: {
+//   type: DataTypes.STRING,
+//     allowNull: false
+// },
+
 const Rooms = db.define('rooms', {
-    id: {
-      type: DataTypes.UUID,
-      autoIncrement: true,
+    roomid: {
+      type: DataTypes.STRING,
       primaryKey: true,
       allowNull: false
     },
-    roomName: {
+    roomname: {
       type: DataTypes.STRING,
       allowNull: false
     },
-    roomId: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    }
+    // id: {
+    //   type: DataTypes.UUID,
+    //   autoIncrement: true,
+    //   primaryKey: true,
+    //   allowNull: false
+    // },
+    // roomname: {
+    //   type: DataTypes.STRING,
+    //   allowNull: false
+    // },
+    // roomid: {
+    //   type: DataTypes.STRING,
+    //   allowNull: false
+    // }
   },
   {
     createdAt   : 'createdat',
@@ -32,6 +53,13 @@ const Rooms = db.define('rooms', {
     tableName: 'rooms',
   })
 
+
+Rooms.hasMany(Tabs, {foreignKey: 'roomid', onDelete: "cascade" });
+
+// Rooms.hasMany(Tabs, {as: 'tabs'});
+// Tabs.belongsTo(Rooms, {foreignKey: 'roomid', as: 'rooms', onDelete: "cascade" })
+
+// Tabs.hasOne(Rooms, {foreignKey: 'tabid', onDelete: "cascade" });
 // History.buildNewRecord = function (roomid, userid, history) {
 //   return this.build({
 //     roomid,

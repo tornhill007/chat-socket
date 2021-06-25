@@ -1,5 +1,6 @@
 const {Sequelize, DataTypes} = require('sequelize');
 const db = require('../config/database');
+const Tabs = require('../models/Tabs');
 
 
 const Users = db.define('users', {
@@ -23,6 +24,13 @@ const Users = db.define('users', {
     tableName: 'users',
 
   })
+
+
+Users.hasMany(Tabs, {foreignKey: 'userid', onDelete: "cascade" });
+
+//
+// Users.hasMany(Tabs, {as: 'tabs'});
+// Tabs.belongsTo(Users, {foreignKey: 'userid', as: 'users', onDelete: "cascade" })
 
 Users.findUsersByUserName = function (username) {
   return this.findAll({where: {username}});

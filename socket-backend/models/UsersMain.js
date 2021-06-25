@@ -8,19 +8,19 @@ const UsersTmp = db.define('usersmain', {
       primaryKey: true,
       allowNull: false
     },
-    userName: {
+    username: {
       type: DataTypes.STRING,
       allowNull: false
     },
-    userId: {
+    userid: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
-    roomId: {
+    roomid: {
       type: DataTypes.STRING,
       allowNull: false
     },
-    socketId: {
+    socketid: {
       type: DataTypes.STRING,
       allowNull: false
     },

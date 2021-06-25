@@ -69,9 +69,10 @@ const authReducer = (state = initialState, action) => {
             };
 
         case SET_ROOM_HISTORY:
+
             let roomHistoryClone = JSON.parse(JSON.stringify(state.roomHistory));
             let wordsUserName = action.history.map(item => item.text.split(' '))
-            console.log(action.history);
+            console.log("ACTION_HISTORY", action.history);
             let newHistory = action.history.filter((item, index) => {
                 return (!(wordsUserName[index][1] && wordsUserName[index][1] === action.userName && wordsUserName[index][2] === 'joined')) && !(wordsUserName[index][0] === 'Welcome,' && wordsUserName[index][1] !== action.userName)
             })

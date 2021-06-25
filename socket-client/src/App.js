@@ -13,10 +13,19 @@ import {compose} from "redux";
 import {setAuthUserData} from "./redux/reducers/authReducer";
 import store from "./redux/store";
 import Game from "./components/Games/Game";
+import {generateUID} from "./utils/generateUID";
 
 class App extends React.Component {
 
     componentDidMount() {
+
+
+        if(!JSON.parse(sessionStorage.getItem('tabId'))) {
+            let tabId = generateUID();
+            window.sessionStorage.setItem("tabId", JSON.stringify(tabId))
+        }
+
+
         if (JSON.parse(localStorage.getItem('user'))) {
             let user = JSON.parse(localStorage.getItem('user'));
             if (user.timestamp > Date.now() - 3600000) {
