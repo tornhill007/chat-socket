@@ -9,22 +9,15 @@ const buildNewRecord = require('./buildNewRecord');
 const socketMap = require('./map')
 const createObjectFromMessage = require('../helpers/createObjectFromMessage')
 
-// const emitNewMessage = async (io, m, user) => {
-//
-//   let usersInRoom = await UsersMain.findAll({
-//     where: {
-//       roomid: user.roomid
-//     }
-//   })
-//   io.to(user.roomid).emit("users/update", usersInRoom);
-//   io.to(user.roomid).emit("messages/new", m("admin", `User ${user.username} left`))
-//
-//   await buildNewRecord(user.roomid, null, {name: 'admin', text: `User ${user.username} left`})
-// }
-
 const exitFromRoom = async (tab, user) => {
 
-  // const user = await Users.findUserByUserId(user.userid)
+  await Tabs.destroy({
+    where: {
+      tabid: tab.tabid,
+      userid: user.userid
+    }
+  });
+
   let room = await Rooms.findOne({
     include: [{
       model: Tabs,
@@ -69,19 +62,11 @@ const exitFromRoom = async (tab, user) => {
 
   let tabs = roomWithTabs.tabs.map((t) => t.tabid)
   let usersInRoom = await Users.getUsersIncludeTabs(tabs);
-  // if (usersInRoom.length === 0) {
-  //   await room.destroy();
-  //   return;
-  // }
   let isUserInRoom = usersInRoom.find(item => item.userid == tab.userid);
   if (isUserInRoom) return;
 
-
   const message = createObjectFromMessage('admin', `User ${user.username} left`)
   await buildNewRecord(room.roomid, null, message);
-
-  // io.emit("rooms/getAll", createdRooms);
-  // io.emit("rooms/getAll", createdRooms);
 
   for (let i = 0; i < tabs.length; i++) {
     const socket = socketMap[tabs[i]]

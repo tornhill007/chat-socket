@@ -137,7 +137,6 @@ io.on("connection", async (socket) => {
   // socket.user = user;
   socketMap[socket.handshake.query.tabId] = socket;
 
-
   let tab = await Tabs.getTabById(socket.handshake.query.tabId);
 
   if (!tab) {
@@ -146,12 +145,8 @@ io.on("connection", async (socket) => {
 
   socket.user = user;
   console.log("correct connection")
-  socket.emit('connection/success');
-
 
   socket.on("users/left", async (callback) => {
-
-
     let user = socket.user;
     await exitFromRoom(tab, user);
 
@@ -179,15 +174,11 @@ io.on("connection", async (socket) => {
 
     let user = socket.user;
 
-    // socket.join(roomId);
-
     let room = await Rooms.findOne({
       where: {
         roomid: roomId
       }
     })
-    // getRoomById(roomId);
-
 
     if (!room) {
       let newRoom = Rooms.build({
@@ -210,18 +201,16 @@ io.on("connection", async (socket) => {
         required: true
       }]
     });
-    // getRoomByIdIncludeTabs(roomId);
 
     let tabs = roomWithTabs.tabs.filter(t => t.tabid !== tab.tabid).map((t) => t.tabid)
 
     let usersInRoom = await Users.getUsersIncludeTabs(tabs);
-    let isUserInRoom = usersInRoom.find(item => item.userid === user.userid );
-
+    let isUserInRoom = usersInRoom.find(item => item.userid == user.userid);
 
     if (isUserInRoom) {
       for (let i = 0; i < roomWithTabs.tabs.length; i++) {
         const socket = socketMap[roomWithTabs.tabs[i].tabid]
-        socket.emit("users/update", usersInRoom.map((u) => ( {
+        socket.emit("users/update", usersInRoom.map((u) => ({
           userid: u.userid,
           username: u.username
         })));
@@ -230,29 +219,20 @@ io.on("connection", async (socket) => {
       return
     }
     usersInRoom.push(user)
-    // socket.emit('messages/new', m('admin', `Welcome, ${user.username}`));
-    // await buildNewRecord(roomId, null, {name: 'admin', text: `Welcome, ${user.username}`});
-    //
-    // socket.broadcast.to(roomId).emit('messages/new', m('admin', `User ${user.username} joined`));
-    // await buildNewRecord(roomId, null, {name: 'admin', text: `User ${user.username} joined`})
-
 
     let createdRooms = await Rooms.findAll();
 
-   let res = createObjectFromMessage('admin', `Welcome, ${user.username}`)
+    // let res = createObjectFromMessage('admin', `Welcome, ${user.username}`)
     socket.emit('messages/new', createObjectFromMessage('admin', `Welcome, ${user.username}`));
-    // await buildNewRecord(roomId, null, {name: 'admin', text: `Welcome, ${user.username}`});
 
     const message = createObjectFromMessage('admin', `${user.username} joined`)
     await buildNewRecord(roomId, null, message);
 
     io.emit("rooms/getAll", createdRooms);
 
-    // let filteredTabs = tabs.filter(t => t !== tab.tabid)
-
     for (let i = 0; i < roomWithTabs.tabs.length; i++) {
       const socket = socketMap[roomWithTabs.tabs[i].tabid]
-      socket.emit("users/update", usersInRoom.map((u) => ( {
+      socket.emit("users/update", usersInRoom.map((u) => ({
         userid: u.userid,
         username: u.username
       })));
@@ -264,17 +244,27 @@ io.on("connection", async (socket) => {
     }
   })
 
-
   socket.on('disconnect', async (data) => {
     console.log("correct disconnection")
 
-    // tabsForHistory.push(socket.handshake.query.tabId);
-    // let sameTabs = tabsForHistory.filter(tab => tab === socket.handshake.query.tabId)
-    // if(sameTabs.length !== 1) {
-    //   tabsForHistory.pop();
-    //   return;
-    // }
+    let tabsByTabId = await Tabs.findAll({
+      where: {
+        tabid: tab.tabid
+      }
+    })
 
+    let isInRoom = tabsByTabId.find(item => item.roomid)
+
+    if (!isInRoom) {
+      return;
+    }
+    let sameTab = tabsForHistory.find(tab => tab.userid === socket.user.userid)
+    if (sameTab) {
+      tabsForHistory = [];
+      return;
+    }
+
+    tabsForHistory.push(tab);
     let user = socket.user;
     await exitFromRoom(tab, user)
     delete socketMap[socket.handshake.query.tabId];
@@ -295,7 +285,6 @@ io.on("connection", async (socket) => {
         }
       }]
     })
-    // getRoomIncludeTabs(socket.handshake.query.tabId)
 
     if (room) {
       let usersByRoom = await Rooms.findOne({
@@ -307,7 +296,6 @@ io.on("connection", async (socket) => {
           required: true
         }]
       });
-      // getRoomByIdIncludeTabs(roomId);
 
       let tabs = []
 
@@ -327,17 +315,6 @@ io.on("connection", async (socket) => {
         name: `${userInfo.username}`,
         text: `${data.message}`
       })
-
-      // newMap.forEach(socket => {
-      //
-      // })
-
-      // io.to(room.roomid).emit('messages/new', m(userInfo.username, data.message, userInfo.userid))
-      //
-      // await buildNewRecord(room.roomid, userInfo.userid, {
-      //   name: `${userInfo.username}`,
-      //   text: `${data.message}`
-      // })
     }
     callback();
   })

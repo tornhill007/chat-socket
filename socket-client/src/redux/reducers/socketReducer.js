@@ -45,7 +45,17 @@ const authReducer = (state = initialState, action) => {
       };
     case UPDATE_MESSAGE:
      let clone = JSON.parse(JSON.stringify(state.roomHistory));
-      if(!action.message && state.roomHistory.length === 0) {
+     let flag = false;
+     console.log("clone", clone)
+      clone.forEach(item => {
+        let arrText = item.text.split(' ');
+        console.log("arrText", arrText)
+        if((arrText[0] === action.userName && arrText[1] === 'joined') || (arrText[1] && arrText[1] === action.userName) ) {
+          flag = true;
+        }
+      })
+      if(!action.message && ((state.roomHistory.length >= 0) && !flag) || clone.length === 0) {
+        console.log("cloneclone", clone);
         clone.push({name: 'admin', text: `Welcome, ${action.userName}`})
         return {
           ...state,
