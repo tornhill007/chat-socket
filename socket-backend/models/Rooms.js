@@ -54,33 +54,45 @@ const Rooms = db.define('rooms', {
   })
 
 
+Rooms.getRoomIncludeTabs = (tabid) => {
+  return this.findOne({
+    include: [{
+      model: Tabs,
+      required: true,
+      where: {
+        tabid
+      }
+    }]
+  })
+}
+
+Rooms.buildNewRoom = (roomid, roomname) => {
+  return this.build({
+    roomid,
+    roomname
+  })
+}
+
+Rooms.getRoomById = (roomid) => {
+  return this.findOne({
+    where: {
+      roomid
+    }
+  })
+}
+
+Rooms.getRoomByIdIncludeTabs = (roomid) => {
+  return this.findOne({
+    where: {
+      roomid
+    },
+    include: [{
+      model: Tabs,
+      required: true
+    }]
+  });
+}
+
 Rooms.hasMany(Tabs, {foreignKey: 'roomid', onDelete: "cascade" });
-
-// Rooms.hasMany(Tabs, {as: 'tabs'});
-// Tabs.belongsTo(Rooms, {foreignKey: 'roomid', as: 'rooms', onDelete: "cascade" })
-
-// Tabs.hasOne(Rooms, {foreignKey: 'tabid', onDelete: "cascade" });
-// History.buildNewRecord = function (roomid, userid, history) {
-//   return this.build({
-//     roomid,
-//     userid,
-//     history
-//   });
-// }
-//
-// History.getHistoryByRoomId = function (roomid) {
-//   return this.findOne({
-//     where: {
-//       roomid
-//     }
-//   })
-// }
-//
-// History.buildNewHistory = (roomid, history) => {
-//   return this.build({
-//     roomid,
-//     history
-//   })
-// }
 
 module.exports = Rooms;

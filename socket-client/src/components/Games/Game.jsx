@@ -63,7 +63,7 @@ class Home extends React.Component {
     }
 
     componentDidMount() {
-
+        this.props.resetRoomHistory()
         this.props.getRoomHistory(this.props.match.params.gameId, this.props.userName);
 
         // setTimeout(() => {

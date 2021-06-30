@@ -26,6 +26,8 @@ const auth = require('./routes/auth');
 const usersRoute = require('./routes/users');
 const history = require('./routes/history');
 const Op = require('sequelize').Op;
+const socketMap = require('./common/map');
+const createObjectFromMessage = require('./helpers/createObjectFromMessage')
 
 //Test DB
 app.use(cors());
@@ -44,6 +46,8 @@ app.use(history);
 app.use(passport.initialize());
 require('./middleware/passport')(passport);
 
+let tabsForHistory = [];
+
 const io = require("socket.io")(httpServer, {
   cors: {
     origin: '*',
@@ -51,7 +55,7 @@ const io = require("socket.io")(httpServer, {
 });
 
 
-const m = (name, text, id) => ({name, text, id})
+// const m = (name, text, id) => ({name, text, id})
 
 // const chatHandlers = require('.///')
 //
@@ -109,7 +113,20 @@ const m = (name, text, id) => ({name, text, id})
 //   })
 // }
 
+
 io.on("connection", async (socket) => {
+  let decoded = null
+  try {
+    decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
+  } catch (e) {
+    console.log('Invalid token', e)
+  }
+
+  if (!decoded) return;
+  let user = await Users.getUserByUserId(decoded.userId);
+  if (!user) return;
+  console.log("[SOCKET_ID]", socket.id);
+
   // chatHandlers(socket)
   // roomHandlers(socket)
   // adminHandlers(socket)
@@ -117,129 +134,27 @@ io.on("connection", async (socket) => {
   // chatHandlers(socket)
   // chatHandlers(socket)
 
-  if (socket.handshake.query.loggeduser !== "null") {
-    console.log("[SOCKET_ID]", socket.id);
-    let decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
-    let user = await Users.getUserByUserId(decoded.userId);
-    if (!user) {
-      return;
-    }
+  // socket.user = user;
+  socketMap[socket.handshake.query.tabId] = socket;
 
-    let tab = await Tabs.findOne({
-      where: {
-        tabid: socket.handshake.query.tabId
-      }
-    });
-    if(!tab) {
-      await user.createTab({tabid: socket.handshake.query.tabId});
-    }
-    else {
-     let room = await Rooms.findOne({
-       include: [{
-         model: Tabs,
-         required: true,
-         where: {
-           tabid: socket.handshake.query.tabId
-         }
-       }]
-     })
-      if(room) {
-        socket.join(room.roomid);
-      }
-    }
 
-    socket.user = user;
-    console.log("correct connection")
+  let tab = await Tabs.getTabById(socket.handshake.query.tabId);
+
+  if (!tab) {
+    tab = await user.createTab({tabid: socket.handshake.query.tabId});
   }
 
+  socket.user = user;
+  console.log("correct connection")
+  socket.emit('connection/success');
+
+
   socket.on("users/left", async (callback) => {
-    // await exitFromRoom(socket.id, io, m);
+
 
     let user = socket.user;
-    let tab = await Tabs.findOne({
-      where: {
-        tabid: socket.handshake.query.tabId
-      }
-    })
+    await exitFromRoom(tab, user);
 
-    let room = await Rooms.findOne({
-      include: [{
-        model: Tabs,
-        required: true,
-        where: {
-          tabid: socket.handshake.query.tabId
-        }
-      }]
-    })
-
-    await tab.destroy();
-
-    let tabRoom = await Tabs.findOne({
-      where: {
-        roomid: room.roomid,
-        tabid: socket.handshake.query.tabId
-      }
-    })
-
-    await tabRoom.destroy();
-
-    let usersByRoom = await Rooms.findOne({
-      where: {
-        roomid: room.roomid
-      },
-      include: [{
-        model: Tabs,
-        required: true
-      }]
-    });
-
-    if(usersByRoom) {
-      let tabs = []
-
-
-      usersByRoom.tabs.forEach(tab => {
-        tabs.push(tab.tabid)
-      })
-
-      let usersInRoom = await Users.findAll({
-        include: [{
-          model: Tabs,
-          where: {
-            tabid: tabs
-          }
-        }]
-      })
-
-      let isUserInRoom = usersInRoom.find(item => item.userid === user.userid);
-
-      if(usersInRoom.length === 0) {
-        let roomTmp = await Rooms.findOne({
-          where: {
-            roomid: room.roomid
-          }
-        })
-        await roomTmp.destroy();
-      }
-
-      if(!isUserInRoom) {
-        io.to(room.roomid).emit("users/update", usersInRoom);
-        io.to(room.roomid).emit("messages/new", m("admin", `User ${user.username} left`))
-        await buildNewRecord(room.roomid, null, {name: 'admin', text: `User ${user.username} left`})
-      }
-    }
-    else {
-      let roomTmp = await Rooms.findOne({
-        where: {
-          roomid: room.roomid
-        }
-      })
-      await roomTmp.destroy();
-    }
-    let createdRooms = await Rooms.findAll();
-    io.emit("rooms/getAll", createdRooms);
-    console.log(123)
-    
-    
     callback()
   })
 
@@ -264,162 +179,105 @@ io.on("connection", async (socket) => {
 
     let user = socket.user;
 
-    socket.join(roomId);
+    // socket.join(roomId);
 
     let room = await Rooms.findOne({
       where: {
         roomid: roomId
       }
     })
+    // getRoomById(roomId);
+
 
     if (!room) {
-      data.room.id = roomId
       let newRoom = Rooms.build({
-        roomid: data.room.id,
+        roomid: roomId,
         roomname: data.room.name
       })
-
-      newRoom.createTab({tabid: socket.handshake.query.tabId});
-
       await newRoom.save();
 
-    } else {
-      room.createTab({tabid: socket.handshake.query.tabId});
-
+      room = newRoom
     }
 
-    callback({userId: user.userid})
+    await room.createTab({tabid: socket.handshake.query.tabId});
 
-
-    let createdRooms = await Rooms.findAll();
-
-    io.emit("rooms/getAll", createdRooms);
-
-
-    let usersByRoom = await Rooms.findOne({
+    let roomWithTabs = await Rooms.findOne({
       where: {
         roomid: roomId
-      },
-      include: [{
-       model: Tabs,
-       required: true
-     }]
-    });
-
-    let tabs = []
-
-    usersByRoom.tabs.forEach(tab => {
-      tabs.push(tab.tabid)
-    })
-
-    let usersInRoom = await Users.findAll({
-      include: [{
-        model: Tabs,
-        where: {
-          tabid: tabs
-        }
-      }]
-    })
-    
-    let isUserInRoom = usersInRoom.find(item => item.userid === user.userid);
-    if(isUserInRoom.tabs.length === 1) {
-      socket.emit('messages/new', m('admin', `Welcome, ${user.username}`));
-      await buildNewRecord(roomId, null, {name: 'admin', text: `Welcome, ${user.username}`});
-      
-      socket.broadcast.to(roomId).emit('messages/new', m('admin', `User ${user.username} joined`));
-      await buildNewRecord(roomId, null, {name: 'admin', text: `User ${user.username} joined`})
-    }
-
-    io.to(roomId).emit("users/update", usersInRoom);
-
-  })
-
-  socket.on('disconnect', async (data) => {
-    console.log("correct disconnection")
-
-    let user = socket.user;
-    let tab = await Tabs.findOne({
-      where: {
-        tabid: socket.handshake.query.tabId
-      }
-    })
-
-    let room = await Rooms.findOne({
-      include: [{
-        model: Tabs,
-        required: true,
-        where: {
-          tabid: socket.handshake.query.tabId
-        }
-      }]
-    })
-
-    await tab.destroy();
-
-    let tabRoom = await Tabs.findOne({
-      where: {
-        roomid: room.roomid,
-        tabid: socket.handshake.query.tabId
-      }
-    })
-
-    await tabRoom.destroy();
-
-    let usersByRoom = await Rooms.findOne({
-      where: {
-        roomid: room.roomid
       },
       include: [{
         model: Tabs,
         required: true
       }]
     });
+    // getRoomByIdIncludeTabs(roomId);
 
-    if(usersByRoom) {
-      let tabs = []
+    let tabs = roomWithTabs.tabs.filter(t => t.tabid !== tab.tabid).map((t) => t.tabid)
+
+    let usersInRoom = await Users.getUsersIncludeTabs(tabs);
+    let isUserInRoom = usersInRoom.find(item => item.userid === user.userid );
 
 
-      usersByRoom.tabs.forEach(tab => {
-        tabs.push(tab.tabid)
-      })
-
-      let usersInRoom = await Users.findAll({
-        include: [{
-          model: Tabs,
-          where: {
-            tabid: tabs
-          }
-        }]
-      })
-
-      let isUserInRoom = usersInRoom.find(item => item.userid === user.userid);
-
-      if(usersInRoom.length === 0) {
-        let roomTmp = await Rooms.findOne({
-          where: {
-            roomid: room.roomid
-          }
-        })
-        await roomTmp.destroy();
+    if (isUserInRoom) {
+      for (let i = 0; i < roomWithTabs.tabs.length; i++) {
+        const socket = socketMap[roomWithTabs.tabs[i].tabid]
+        socket.emit("users/update", usersInRoom.map((u) => ( {
+          userid: u.userid,
+          username: u.username
+        })));
       }
+      socket.emit('messages/new', false);
+      return
+    }
+    usersInRoom.push(user)
+    // socket.emit('messages/new', m('admin', `Welcome, ${user.username}`));
+    // await buildNewRecord(roomId, null, {name: 'admin', text: `Welcome, ${user.username}`});
+    //
+    // socket.broadcast.to(roomId).emit('messages/new', m('admin', `User ${user.username} joined`));
+    // await buildNewRecord(roomId, null, {name: 'admin', text: `User ${user.username} joined`})
 
-      if(!isUserInRoom) {
-        io.to(room.roomid).emit("users/update", usersInRoom);
-        io.to(room.roomid).emit("messages/new", m("admin", `User ${user.username} left`))
-        await buildNewRecord(room.roomid, null, {name: 'admin', text: `User ${user.username} left`})
-      }
-    }
-    else {
-      let roomTmp = await Rooms.findOne({
-        where: {
-          roomid: room.roomid
-        }
-      })
-      await roomTmp.destroy();
-    }
+
     let createdRooms = await Rooms.findAll();
+
+   let res = createObjectFromMessage('admin', `Welcome, ${user.username}`)
+    socket.emit('messages/new', createObjectFromMessage('admin', `Welcome, ${user.username}`));
+    // await buildNewRecord(roomId, null, {name: 'admin', text: `Welcome, ${user.username}`});
+
+    const message = createObjectFromMessage('admin', `${user.username} joined`)
+    await buildNewRecord(roomId, null, message);
+
     io.emit("rooms/getAll", createdRooms);
-    console.log(123)
+
+    // let filteredTabs = tabs.filter(t => t !== tab.tabid)
+
+    for (let i = 0; i < roomWithTabs.tabs.length; i++) {
+      const socket = socketMap[roomWithTabs.tabs[i].tabid]
+      socket.emit("users/update", usersInRoom.map((u) => ( {
+        userid: u.userid,
+        username: u.username
+      })));
+    }
+
+    for (let i = 0; i < tabs.length; i++) {
+      const socket = socketMap[tabs[i]]
+      socket.emit('messages/new', message);
+    }
+  })
+
+
+  socket.on('disconnect', async (data) => {
+    console.log("correct disconnection")
+
+    // tabsForHistory.push(socket.handshake.query.tabId);
+    // let sameTabs = tabsForHistory.filter(tab => tab === socket.handshake.query.tabId)
+    // if(sameTabs.length !== 1) {
+    //   tabsForHistory.pop();
+    //   return;
+    // }
+
+    let user = socket.user;
+    await exitFromRoom(tab, user)
+    delete socketMap[socket.handshake.query.tabId];
   })
 
   socket.on("createMessage", async (data, callback) => {
@@ -436,15 +294,50 @@ io.on("connection", async (socket) => {
           tabid: socket.handshake.query.tabId
         }
       }]
-    });
+    })
+    // getRoomIncludeTabs(socket.handshake.query.tabId)
 
     if (room) {
-      io.to(room.roomid).emit('messages/new', m(userInfo.username, data.message, userInfo.userid))
+      let usersByRoom = await Rooms.findOne({
+        where: {
+          roomid: room.roomid
+        },
+        include: [{
+          model: Tabs,
+          required: true
+        }]
+      });
+      // getRoomByIdIncludeTabs(roomId);
+
+      let tabs = []
+
+      usersByRoom.tabs.forEach(tab => {
+        tabs.push(tab.tabid)
+      })
+
+      let sockets = tabs.map(tab => {
+        return socketMap[tab];
+      })
+
+      for (let i = 0; i < sockets.length; i++) {
+        sockets[i].emit('messages/new', createObjectFromMessage(userInfo.username, data.message, userInfo.userid));
+      }
 
       await buildNewRecord(room.roomid, userInfo.userid, {
         name: `${userInfo.username}`,
         text: `${data.message}`
       })
+
+      // newMap.forEach(socket => {
+      //
+      // })
+
+      // io.to(room.roomid).emit('messages/new', m(userInfo.username, data.message, userInfo.userid))
+      //
+      // await buildNewRecord(room.roomid, userInfo.userid, {
+      //   name: `${userInfo.username}`,
+      //   text: `${data.message}`
+      // })
     }
     callback();
   })

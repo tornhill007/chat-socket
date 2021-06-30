@@ -46,6 +46,13 @@ const Tabs = db.define('tabs', {
     tableName: 'tabs',
   })
 
+Tabs.getTabById = function (tabid) {
+  return this.findOne({
+    where: {
+      tabid
+    }
+  });
+}
 
 
 module.exports = Tabs;

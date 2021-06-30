@@ -1,143 +1,96 @@
 const History = require('../models/History');
 const ConnectedUsers = require('../models/ConnectedUsers');
 const UsersTmp = require('../models/UsersTmp');
+const Tabs = require('../models/Tabs');
 const UsersMain = require('../models/UsersMain');
 const Rooms = require('../models/Rooms');
+const Users = require('../models/Users');
 const buildNewRecord = require('./buildNewRecord');
+const socketMap = require('./map')
+const createObjectFromMessage = require('../helpers/createObjectFromMessage')
 
-const emitNewMessage = async (io, m, user) => {
+// const emitNewMessage = async (io, m, user) => {
+//
+//   let usersInRoom = await UsersMain.findAll({
+//     where: {
+//       roomid: user.roomid
+//     }
+//   })
+//   io.to(user.roomid).emit("users/update", usersInRoom);
+//   io.to(user.roomid).emit("messages/new", m("admin", `User ${user.username} left`))
+//
+//   await buildNewRecord(user.roomid, null, {name: 'admin', text: `User ${user.username} left`})
+// }
 
-  let usersInRoom = await UsersMain.findAll({
+const exitFromRoom = async (tab, user) => {
+
+  // const user = await Users.findUserByUserId(user.userid)
+  let room = await Rooms.findOne({
+    include: [{
+      model: Tabs,
+      required: true,
+      where: {
+        tabid: tab.tabid
+      }
+    }]
+  })
+
+  await Tabs.destroy({
     where: {
-      roomid: user.roomid
+      roomid: room.roomid,
+      tabid: tab.tabid
     }
   })
-  io.to(user.roomid).emit("users/update", usersInRoom);
-  io.to(user.roomid).emit("messages/new", m("admin", `User ${user.username} left`))
 
-  await buildNewRecord(user.roomid, null, {name: 'admin', text: `User ${user.username} left`})
-}
+  if (!room) return;
 
-const exitFromRoom = async (socketId, io, m) => {
-  // const connectedUser = connectedUsersInstance.getBySocketId(socketId);
-  const connectedUser = await ConnectedUsers.findOne({
+  let roomWithTabs = await Rooms.findOne({
     where: {
-      socketid: socketId
+      roomid: room.roomid
+    },
+    include: [{
+      model: Tabs,
+      required: true
+    }]
+  });
+  if (!roomWithTabs) {
+    await room.destroy();
+    await History.destroy({
+      where: {
+        roomid: room.roomid
+      }
+    })
+    let createdRooms = await Rooms.findAll();
+    for(let key in socketMap) {
+      socketMap[key].emit("rooms/getAll", createdRooms)
     }
-  })
-  if (connectedUser) {
+    return;
+  }
 
-    // let removedConnectedUser = connectedUsersInstance.removeConnectedUserById(socketId);
-
-    let removedConnectedUser = ConnectedUsers.destroy({
-      where: {
-        socketid: socketId
-      }
-    })
-
-    // let removedUser = usersTmpInstance.remove(connectedUser.userId, removedConnectedUser.socketId);
-    let removedUser = await UsersTmp.findOne({
-      where: {
-        userid: connectedUser.userid,
-        socketid: connectedUser.socketid
-      }
-    })
-
-    let room = await Rooms.findOne({
-      where: {
-        roomid: removedUser.roomid
-      }
-    })
-
-    // removedUser.removeRoom(room);
-
-    await removedUser.destroy();
-      // usersTmpInstance.remove(connectedUser.userId, removedConnectedUser.socketId);
+  let tabs = roomWithTabs.tabs.map((t) => t.tabid)
+  let usersInRoom = await Users.getUsersIncludeTabs(tabs);
+  // if (usersInRoom.length === 0) {
+  //   await room.destroy();
+  //   return;
+  // }
+  let isUserInRoom = usersInRoom.find(item => item.userid == tab.userid);
+  if (isUserInRoom) return;
 
 
-    // let usersInRoom = usersTmpInstance.getByRoom(removedUser.room);
+  const message = createObjectFromMessage('admin', `User ${user.username} left`)
+  await buildNewRecord(room.roomid, null, message);
 
-    let usersInRoom = await UsersTmp.findAll({
-      where: {
-        roomid: removedUser.roomid
-      }
-    });
+  // io.emit("rooms/getAll", createdRooms);
+  // io.emit("rooms/getAll", createdRooms);
 
-    let isUserInRoom = usersInRoom.find(item => item.userid === removedUser.userid);
+  for (let i = 0; i < tabs.length; i++) {
+    const socket = socketMap[tabs[i]]
+    socket.emit('messages/new', message);
 
-    if (usersInRoom.length !== 0) {
-
-      // let currentUserInRoom = usersInstance.getByRoom(removedUser.room);
-      let currentUserInRoom = await UsersMain.findAll({
-        where: {
-          roomid: removedUser.roomid
-        }
-      });
-
-      let result = currentUserInRoom.find(item => item.userid === removedUser.userid);
-      if (!result) {
-        let removedUserMain = await UsersMain.findOne({
-          where: {
-            userid: removedUser.userid,
-            socketid: removedUser.socketid
-          }
-        })
-
-        await removedUserMain.destroy();
-        // usersInstance.remove(removedUser.id, removedUser.socketId);
-
-        await emitNewMessage(io, m, removedUser);
-
-      } else if (!isUserInRoom) {
-        let removedUserMain = await UsersMain.findOne({
-          where: {
-            userid: result.userid,
-            socketid: result.socketid
-          }
-        })
-
-        await removedUserMain.destroy();
-        // usersInstance.remove(result.id, result.socketId);
-        await emitNewMessage(io, m, result);
-      }
-    } else {
-
-      let removedUserMain = await UsersMain.findOne({
-        where: {
-          userid: removedUser.userid,
-          socketid: removedUser.socketid
-        }
-      })
-
-      await removedUserMain.destroy();
-
-      await emitNewMessage(io, m, removedUser);
-
-      let removedRoom = await Rooms.destroy({
-        where: {
-          roomid: removedUser.roomid
-        }
-      })
-      // roomsInstance.removeByRoomId(removedUser.room);
-
-      // let tmp = usersTmpInstance.getByRoom(removedUser.room)
-      let tmp = await UsersTmp.findAll({
-        where: {
-          roomid: removedUser.roomid
-        }
-      })
-      if (!tmp || tmp.length === 0) {
-
-        // let createdRooms = roomsInstance.getAll();
-        let createdRooms = await Rooms.findAll();
-        io.emit("rooms/getAll", createdRooms);
-        let history = await History.destroy({
-          where: {
-            roomid: removedUser.roomid
-          }
-        });
-      }
-    }
+    socket.emit("users/update", usersInRoom.map((u) => ( {
+      userid: u.userid,
+      username: u.username
+    })));
   }
 }
 

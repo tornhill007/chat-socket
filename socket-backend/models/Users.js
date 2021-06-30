@@ -54,6 +54,16 @@ Users.getUserByUserId = function (userid) {
     }
   });
 }
+Users.getUsersIncludeTabs = function (tabs) {
+  return this.findAll({
+    include: [{
+      model: Tabs,
+      where: {
+        tabid: tabs
+      }
+    }]
+  })
+}
 
 
 module.exports = Users;
