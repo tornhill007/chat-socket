@@ -54,7 +54,9 @@ const authReducer = (state = initialState, action) => {
           flag = true;
         }
       })
-      if(!action.message && ((state.roomHistory.length >= 0) && !flag) || clone.length === 0) {
+      let lastRecord = clone[clone.length - 1] && clone[clone.length - 1].text.split(' ');
+
+      if(!action.message && ((state.roomHistory.length >= 0) && !flag) || clone.length === 0 || (lastRecord[2] && lastRecord[2] === 'left' && lastRecord[1] === action.userName)) {
         console.log("cloneclone", clone);
         clone.push({name: 'admin', text: `Welcome, ${action.userName}`})
         return {

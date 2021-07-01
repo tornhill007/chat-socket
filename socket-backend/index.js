@@ -244,31 +244,31 @@ io.on("connection", async (socket) => {
     }
   })
 
-  socket.on('disconnect', async (data) => {
-    console.log("correct disconnection")
-
-    let tabsByTabId = await Tabs.findAll({
-      where: {
-        tabid: tab.tabid
-      }
-    })
-
-    let isInRoom = tabsByTabId.find(item => item.roomid)
-
-    if (!isInRoom) {
-      return;
-    }
-    let sameTab = tabsForHistory.find(tab => tab.userid === socket.user.userid)
-    if (sameTab) {
-      tabsForHistory = [];
-      return;
-    }
-
-    tabsForHistory.push(tab);
-    let user = socket.user;
-    await exitFromRoom(tab, user)
-    delete socketMap[socket.handshake.query.tabId];
-  })
+  // socket.on('disconnect', async (data) => {
+  //   console.log("correct disconnection")
+  //
+  //   let tabsByTabId = await Tabs.findAll({
+  //     where: {
+  //       tabid: tab.tabid
+  //     }
+  //   })
+  //
+  //   let isInRoom = tabsByTabId.find(item => item.roomid)
+  //
+  //   if (!isInRoom) {
+  //     return;
+  //   }
+  //   let sameTab = tabsForHistory.find(tab => tab.userid === socket.user.userid)
+  //   if (sameTab) {
+  //     tabsForHistory = [];
+  //     return;
+  //   }
+  //
+  //   tabsForHistory.push(tab);
+  //   let user = socket.user;
+  //   await exitFromRoom(tab, user)
+  //   delete socketMap[socket.handshake.query.tabId];
+  // })
 
   socket.on("createMessage", async (data, callback) => {
 
