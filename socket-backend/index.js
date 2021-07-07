@@ -16,9 +16,7 @@ const History = require('./models/History')
 const Tabs = require('./models/Tabs')
 const Users = require('./models/Users')
 const Rooms = require('./models/Rooms')
-const UsersMain = require('./models/UsersMain')
-const ConnectedUsers = require('./models/ConnectedUsers')
-const UsersTmp = require('./models/UsersTmp')
+const DisconnectTime = require('./models/DisconnectTime')
 const jwt = require("jsonwebtoken");
 const keys = require('./config/keys');
 
@@ -27,6 +25,7 @@ const usersRoute = require('./routes/users');
 const history = require('./routes/history');
 const Op = require('sequelize').Op;
 const socketMap = require('./common/map');
+const userInRoomMap = require('./common/userInRoomMap');
 const createObjectFromMessage = require('./helpers/createObjectFromMessage')
 
 //Test DB
@@ -54,6 +53,7 @@ const io = require("socket.io")(httpServer, {
   }
 });
 
+let isReconnected = {};
 
 // const m = (name, text, id) => ({name, text, id})
 
@@ -115,6 +115,10 @@ const io = require("socket.io")(httpServer, {
 
 
 io.on("connection", async (socket) => {
+
+  isReconnected[socket.handshake.query.tabId] = false;
+
+
   let decoded = null
   try {
     decoded = jwt.verify(socket.handshake.query.loggeduser.split(' ')[1], keys.jwt);
@@ -125,8 +129,7 @@ io.on("connection", async (socket) => {
   if (!decoded) return;
   let user = await Users.getUserByUserId(decoded.userId);
   if (!user) return;
-  console.log("[SOCKET_ID]", socket.id);
-
+  console.log("[SOCKET_ID/tabid]", socket.id, socket.handshake.query.tabId);
   // chatHandlers(socket)
   // roomHandlers(socket)
   // adminHandlers(socket)
@@ -135,16 +138,55 @@ io.on("connection", async (socket) => {
   // chatHandlers(socket)
 
   // socket.user = user;
+
+  if (socketMap[socket.handshake.query.tabId]) {
+    isReconnected[socket.handshake.query.tabId] = true;
+  }
+
   socketMap[socket.handshake.query.tabId] = socket;
 
   let tab = await Tabs.getTabById(socket.handshake.query.tabId);
+  // let deletedTab = await Tabs.destroy({
+  //   where: {
+  //     tabid: socket.handshake.query.tabId
+  //   }
+  // })
 
+  for(let key in socketMap) {
+    console.log(socketMap[key].id);
+  }
   if (!tab) {
     tab = await user.createTab({tabid: socket.handshake.query.tabId});
   }
 
   socket.user = user;
   console.log("correct connection")
+
+  let room = await Rooms.findOne({
+    include: [{
+      model: Tabs,
+      required: true,
+      where: {
+        tabid: tab.tabid
+      }
+    }]
+  })
+
+
+  if (room) {
+    userInRoomMap[socket.handshake.query.tabId] = room.roomid;
+  } else {
+    socket.emit('connecting/redirectFromRoom', false)
+  }
+  // else {
+  //   userInRoomMap[socket.handshake.query.tabId] = room.roomid;
+  // }
+  // socket.emit("socket/get", socket);
+  socket.emit('disconnect/sendUserInfo', room && room.roomid)
+
+  let createdRooms = await Rooms.findAll();
+  socket.emit("rooms/getAll", createdRooms)
+
 
   socket.on("users/left", async (callback) => {
     let user = socket.user;
@@ -172,6 +214,7 @@ io.on("connection", async (socket) => {
       socket.emit('rooms/generateId', roomId);
     }
 
+
     let user = socket.user;
 
     let room = await Rooms.findOne({
@@ -189,6 +232,8 @@ io.on("connection", async (socket) => {
 
       room = newRoom
     }
+
+    userInRoomMap[socket.handshake.query.tabId] = roomId;
 
     await room.createTab({tabid: socket.handshake.query.tabId});
 
@@ -242,6 +287,97 @@ io.on("connection", async (socket) => {
       const socket = socketMap[tabs[i]]
       socket.emit('messages/new', message);
     }
+  })
+
+  socket.on('users/get', async(callback) => {
+
+    let roomWithTabs = await Rooms.findOne({
+      where: {
+        roomid: tab.roomid
+      },
+      include: [{
+        model: Tabs,
+        required: true
+      }]
+    });
+
+    let tabs = roomWithTabs.tabs.filter(t => t.tabid !== tab.tabid).map((t) => t.tabid)
+
+    let usersInRoom = await Users.getUsersIncludeTabs(tabs);
+
+    socket.emit("users/update", usersInRoom.map((u) => ({
+      userid: u.userid,
+      username: u.username
+    })));
+    callback("OK")
+  })
+
+  socket.on('disconnect', async (data) => {
+    if (isReconnected[socket.handshake.query.tabId]) {
+      delete isReconnected[socket.handshake.query.tabId];
+      return;
+    }
+    delete userInRoomMap[socket.handshake.query.tabId];
+
+    let room = await Rooms.findOne({
+      include: [{
+        model: Tabs,
+        required: true,
+        where: {
+          tabid: tab.tabid
+        }
+      }]
+    })
+
+    if (!room) {
+      return;
+    }
+
+    delete socketMap[socket.handshake.query.tabId];
+
+
+    let disconnectTime = await DisconnectTime.findOne({
+      where: {
+        tabid: tab.tabid
+      }
+    })
+    if (disconnectTime) {
+      await DisconnectTime.destroy({
+        where: {
+          tabid: tab.tabid
+        }
+      })
+    }
+    let newDisconnectTime = await DisconnectTime.build({
+      tabid: tab.tabid
+    })
+    await newDisconnectTime.save();
+    let time = newDisconnectTime.createdat.getTime();
+    console.log(time);
+    let timerId = setInterval(async () => {
+      console.log('TIME', Date.now(), time);
+      console.log('USer', userInRoomMap[socket.handshake.query.tabId]);
+      console.log('USer', userInRoomMap);
+      if ((Date.now() - 10000 - 10800000 > time && !userInRoomMap[socket.handshake.query.tabId])) {
+        clearInterval(timerId);
+        let user = socket.user;
+
+        await exitFromRoom(tab, user);
+        await DisconnectTime.destroy({
+          where: {
+            tabid: tab.tabid
+          }
+        })
+      } else if (Date.now() - 10000 - 10800000 > time) {
+        clearInterval(timerId);
+        // delete userInRoomMap[socket.handshake.query.tabId];
+        await DisconnectTime.destroy({
+          where: {
+            tabid: tab.tabid
+          }
+        })
+      }
+    }, 1000)
   })
 
   // socket.on('disconnect', async (data) => {
@@ -308,7 +444,10 @@ io.on("connection", async (socket) => {
       })
 
       for (let i = 0; i < sockets.length; i++) {
-        sockets[i].emit('messages/new', createObjectFromMessage(userInfo.username, data.message, userInfo.userid));
+        if (sockets[i]) {
+          sockets[i].emit('messages/new', createObjectFromMessage(userInfo.username, data.message, userInfo.userid));
+          console.log("[SOCKET_ID/tabid]", sockets[i].id, sockets[i].handshake.query.tabId);
+        }
       }
 
       await buildNewRecord(room.roomid, userInfo.userid, {

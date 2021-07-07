@@ -14,65 +14,60 @@ import {setAuthUserData} from "./redux/reducers/authReducer";
 import store from "./redux/store";
 import Game from "./components/Games/Game";
 import {generateUID} from "./utils/generateUID";
+import Auth from "./components/Auth/Auth";
 
 class App extends React.Component {
 
-    componentDidMount() {
+  componentDidMount() {
 
-
-        if(!JSON.parse(sessionStorage.getItem('tabId'))) {
-            let tabId = generateUID();
-            window.sessionStorage.setItem("tabId", JSON.stringify(tabId))
-        }
-
-
-        if (JSON.parse(localStorage.getItem('user'))) {
-            let user = JSON.parse(localStorage.getItem('user'));
-            if (user.timestamp > Date.now() - 3600000) {
-                this.props.setAuthUserData(user.userId, user.userName, user.token)
-            } else {
-                window.localStorage.removeItem('user');
-                this.props.setAuthUserData(null, null, null)
-            }
-        }
+    if (!JSON.parse(sessionStorage.getItem('tabId'))) {
+      let tabId = generateUID();
+      window.sessionStorage.setItem("tabId", JSON.stringify(tabId))
     }
 
-
-    render() {
-
-        return <div className="App">
-            <div className='app-wrapper-content'>
-                <Switch>
-                    <DashboardLayoutRoute exact path='/' component={Home}/>
-                    <DashboardLayoutRoute path='/game/:gameId' component={Game}/>
-                    <LoginLayoutRoute path='/register' component={Register}/>
-                    <LoginLayoutRoute path='/login' component={Login}/>
-                </Switch>
-            </div>
-        </div>
-
-
-
+    if (JSON.parse(localStorage.getItem('user'))) {
+      let user = JSON.parse(localStorage.getItem('user'));
+      if (user.timestamp > Date.now() - 3600000) {
+        this.props.setAuthUserData(user.userId, user.userName, user.token)
+      } else {
+        window.localStorage.removeItem('user');
+        this.props.setAuthUserData(null, null, null)
+      }
     }
+  }
 
+  render() {
+
+    return <div className="App">
+      <div className='app-wrapper-content'>
+        {/*<Auth/>*/}
+        <Switch>
+          <DashboardLayoutRoute exact path='/' component={Home}/>
+          <DashboardLayoutRoute path='/game/:gameId' component={Game}/>
+          <LoginLayoutRoute path='/register' component={Register}/>
+          <LoginLayoutRoute path='/login' component={Login}/>
+        </Switch>
+      </div>
+    </div>
+
+  }
 }
 
 const mapStateToProps = (state) => ({});
 
 let AppContainer = compose(
-    connect(mapStateToProps, {setAuthUserData}))
+  connect(mapStateToProps, {setAuthUserData}))
 (App);
 
 const mainApp = () => {
-    console.log()
-    return (
-        <BrowserRouter>
-            <Provider store={store}>
-                <AppContainer/>
-            </Provider>
-        </BrowserRouter>
-    );
+  console.log()
+  return (
+    <BrowserRouter>
+      <Provider store={store}>
+        <AppContainer/>
+      </Provider>
+    </BrowserRouter>
+  );
 }
-
 
 export default mainApp;

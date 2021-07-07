@@ -28,6 +28,8 @@ const exitFromRoom = async (tab, user) => {
     }]
   })
 
+  if (!room) return;
+
   await Tabs.destroy({
     where: {
       roomid: room.roomid,
@@ -35,7 +37,7 @@ const exitFromRoom = async (tab, user) => {
     }
   })
 
-  if (!room) return;
+
 
   let roomWithTabs = await Rooms.findOne({
     where: {

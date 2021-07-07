@@ -6,10 +6,10 @@ import {generateUID} from "../../utils/generateUID";
 import {
   setIdRoom,
   setInRoom,
-  setIsMounted,
+  setIsMounted, setIsSocket,
   setRooms,
   setSocket,
-  setUsersToRoom
+  setUsersToRoom, updateMessage
 } from "../../redux/reducers/socketReducer";
 import {withRouter} from 'react-router-dom';
 import classes from './Home.module.css';
@@ -60,62 +60,106 @@ class Home extends React.Component {
     this.props.setUsersToRoom(users);
   }
 
+  componentWillUnmount() {
+    this.props.setIsSocket(false);
+  }
 
   componentDidMount() {
+    if (!this.props.isSocketExist) {
 
-    let socket;
-    // console.log("KEKEKE", this.props.isMounted)
-    // if(!this.props.isMounted) {
-    console.log("OLAOLALOLAOAL")
-    // let token = JSON.parse(localStorage.getItem('user')).token;
-    socket = io('http://192.168.1.229:8080/', {
-      query: {
-        tabId: JSON.parse(sessionStorage.getItem('tabId')),
-        loggeduser: this.props.token
+      let socket;
+// if(this.props.socket) {
+//   return;
+// }
+      console.log("OLAOLALOLAOAL")
+
+      if (this.props.token && JSON.parse(sessionStorage.getItem('tabId'))) {
+        socket = io('http://192.168.1.229:8080/', {
+          query: {
+            tabId: JSON.parse(sessionStorage.getItem('tabId')),
+            loggeduser: this.props.token
+          }
+        });
+
+        socket.on("connect", () => {
+          console.log("sockett_ID", socket.id)
+          this.props.setSocket(socket);
+          // if(this.props.socket && socket.id !== this.props.socket.id) {
+          //
+          // }
+        });
       }
-    });
-    // socket.connect();
-    socket.emit("rooms/get", {}, (data) => {
-    })
 
-    socket.on("rooms/getAll", (data) => {
-      console.log("[ROOMS]", data);
-      this.setRooms(data);
+      // if(this.props.token && JSON.parse(sessionStorage.getItem('tabId'))) {
+      //
+      // }
 
-    })
+      socket && socket.emit("rooms/get", {}, (data) => {
+      })
 
-    socket.on("users/update", (data) => {
-      console.log("[USERS]", data);
-      this.setUsersToRoom(data);
-    })
+      socket && socket.on("rooms/getAll", (data) => {
+        console.log("[ROOMS]", data);
+        this.setRooms(data);
 
-    socket.on('rooms/generateId', (data) => {
-      console.log("ID_ROOM", data)
+      })
 
-      this.props.setIdRoom(data);
-    })
-    // }
-    //     this.props.setIsMounted();
-    // }
+      socket && socket.on("disconnect/sendUserInfo", (data) => {
+        console.log("ROOOOM_IDDDD", data);
+        if (data) {
+          this.props.setIdRoom(data);
+          this.props.setInRoom(true);
+        }
+      })
 
+      socket && socket.on("users/update", (data) => {
+        console.log("[USERS]", data);
+        this.setUsersToRoom(data);
+      })
 
-    // let rooms = io.sockets.adapter.rooms;
-    // console.log("ROOMS", rooms)
-    this.setState({
-      socket: socket
-    })
+      socket && socket.on('rooms/generateId', (data) => {
+        console.log("ID_ROOM", data)
+        this.props.setIdRoom(data);
+      })
 
-    // socket.emit("allRooms", )
+      // }
+      //     this.props.setIsMounted();
+      // }
 
-    this.props.setSocket(socket);
+      // let rooms = io.sockets.adapter.rooms;
+      // console.log("ROOMS", rooms)
+      this.setState({
+        socket: socket
+      })
 
-    // socket.on("newMessage", (data) => {
-    //     console.log("[DATA]", data);
-    //     this.setMessage(data)
-    // })
+      // socket.emit("allRooms", )
 
-
+      // socket.on("newMessage", (data) => {
+      //     console.log("[DATA]", data);
+      //     this.setMessage(data)
+      // })
+    }
+    this.props.setIsSocket(true)
   }
+
+
+  // componentDidUpdate(prevProps, prevState, snapshot) {
+  //   if(prevState.socket !== this.state.socket) {
+  //     this.state.socket.on("messages/new", (data) => {
+  //
+  //       console.log("[DATA1]", data);
+  //       // this.setMessage(data)
+  //       setTimeout(() => {
+  //         this.props.updateMessage(data, this.props.userName)
+  //       }, 100)
+  //
+  //     })
+  //   }
+  // }
+
+  // componentWillUnmount() {
+  //   alert(1)
+  //   this.props.setIsSocket(false);
+  // }
 
   getRooms = () => {
     this.props.socket.emit("rooms/get")
@@ -155,10 +199,15 @@ class Home extends React.Component {
 
 
   render() {
-    console.log(this.props.socket)
+    // console.log("[STORE_SOCKET_ID]", this.props.socket.id)
     console.log("[IN_ROOM]", this.props.inRoom)
     if (this.props.idRoom && this.props.inRoom) {
-      return <Redirect to={`/game/${this.props.idRoom}`}/>
+      return <Redirect to={{
+        pathname: `/game/${this.props.idRoom}`,
+        aboutProps: {
+          socket: this.state.socket
+        }
+      }}/>
     }
     if (!this.props.token) {
       return <Redirect to='/login'/>
@@ -214,6 +263,7 @@ const mapStateToProps = (state) => ({
   inRoom: state.socketPage.inRoom,
   idRoom: state.socketPage.idRoom,
   isMounted: state.socketPage.isMounted,
+  isSocketExist: state.socketPage.isSocketExist,
 })
 
 // let AuthRedirectComponent = withAuthRedirect(Home);
@@ -224,5 +274,7 @@ export default withRouter(connect(mapStateToProps, {
   setIdRoom,
   setInRoom,
   setUsersToRoom,
-  setRooms
+  setRooms,
+  setIsSocket,
+  updateMessage
 })(Home));

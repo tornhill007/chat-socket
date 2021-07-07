@@ -9,6 +9,7 @@ const SET_ROOM_HISTORY = 'SET_ROOM_HISTORY';
 const UPDATE_MESSAGE = 'UPDATE_MESSAGE';
 const RESET_ROOM_HISTORY = 'RESET_ROOM_HISTORY';
 const SET_IS_MOUNTED = 'SET_IS_MOUNTED';
+const SET_IS_SOCKET = 'SET_IS_SOCKET';
 
 let initialState = {
   socket: null,
@@ -18,20 +19,28 @@ let initialState = {
   idRoom: null,
   roomHistory: [],
   isMounted: false,
-  isOneRendered: false
+  isOneRendered: false,
+  isSocketExist: false
 };
 
 const authReducer = (state = initialState, action) => {
   switch (action.type) {
     case SET_SOCKET:
+      // console.log("SOCKET_ID_ACTION", action.socket.id)
       return {
         ...state,
         socket: action.socket
       };
+      case SET_IS_SOCKET:
+      return {
+        ...state,
+        isSocketExist: action.isSocketExist
+      };
     case SET_IS_MOUNTED:
       return {
         ...state,
-        isMounted: true
+        isMounted: true,
+        isOneRendered: false
       };
     case SET_ID_ROOM:
       return {
@@ -96,6 +105,10 @@ const authReducer = (state = initialState, action) => {
       };
 
     case SET_ROOM_HISTORY:
+      console.log("ACTION, ACTION", action.roomId);
+      console.log("ACTION, ACTION", state.idRoom);
+      if(state.idRoom && state.idRoom !== action.roomId) return {...state}
+      console.log("ACTION, ACTION", action);
       console.log("ACTION_HISTORY", action.history);
       console.log("STATE", state.roomHistory);
       // if(!action.message) {
@@ -155,6 +168,11 @@ export const setSocket = (socket) => ({
   socket
 });
 
+export const setIsSocket = (isSocketExist) => ({
+  type: SET_IS_SOCKET,
+  isSocketExist
+});
+
 export const setUsersToRoom = (users) => ({
   type: SET_USERS_TO_ROOM,
   users
@@ -179,9 +197,9 @@ export const setIdRoom = (idRoom) => ({
   idRoom
 });
 
-export const setRoomHistory = (history, userName) => ({
+export const setRoomHistory = (history, userName, roomId) => ({
   type: SET_ROOM_HISTORY,
-  history, userName
+  history, userName, roomId
 });
 
 export const updateMessage = (message, userName) => ({
@@ -198,7 +216,7 @@ export const getRoomHistory = (roomId, userName) => async (dispatch) => {
     let response = await historyApi.getRoomHistory(roomId);
     let modifiedResponse = response.data.map(item => item.history);
     console.log('[HISTORY]', response)
-    dispatch(setRoomHistory(modifiedResponse, userName))
+    dispatch(setRoomHistory(modifiedResponse, userName, response.data[0].roomid))
   } catch (err) {
     console.log(err);
   }
