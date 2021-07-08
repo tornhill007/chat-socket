@@ -1,4 +1,5 @@
 import {authAPI, historyApi} from "../../api/api";
+import historySortByCreatedDate from "../../utils/historySortByCreatedDate";
 
 const SET_SOCKET = 'SET_SOCKET';
 const SET_USERS_TO_ROOM = 'SET_USERS_TO_ROOM';
@@ -10,6 +11,8 @@ const UPDATE_MESSAGE = 'UPDATE_MESSAGE';
 const RESET_ROOM_HISTORY = 'RESET_ROOM_HISTORY';
 const SET_IS_MOUNTED = 'SET_IS_MOUNTED';
 const SET_IS_SOCKET = 'SET_IS_SOCKET';
+const SET_IS_CONNECTED = 'SET_IS_CONNECTED';
+const SET_IS_DISCONNECTED = 'SET_IS_DISCONNECTED';
 
 let initialState = {
   socket: null,
@@ -20,7 +23,9 @@ let initialState = {
   roomHistory: [],
   isMounted: false,
   isOneRendered: false,
-  isSocketExist: false
+  isSocketExist: false,
+  isConnected: false,
+  isDisconnected: false
 };
 
 const authReducer = (state = initialState, action) => {
@@ -35,6 +40,17 @@ const authReducer = (state = initialState, action) => {
       return {
         ...state,
         isSocketExist: action.isSocketExist
+      };
+      case SET_IS_DISCONNECTED:
+        alert( action.isDisconnected)
+      return {
+        ...state,
+        isDisconnected: action.isDisconnected
+      };
+      case SET_IS_CONNECTED:
+      return {
+        ...state,
+        isConnected: true
       };
     case SET_IS_MOUNTED:
       return {
@@ -142,6 +158,8 @@ return state;
       // console.log("modifiedHistory", modifiedHistory);
       // let wordMidified = modifiedHistory.map(item => item.text.split(' '))
       // modifiedHistory.length > 0 && wordMidified[wordMidified.length - 1][0] === 'You' && modifiedHistory.splice(-1, 1);
+
+      historySortByCreatedDate(action.history);
       return {
         ...state,
         roomHistory: action.history,
@@ -176,6 +194,15 @@ export const setIsSocket = (isSocketExist) => ({
 export const setUsersToRoom = (users) => ({
   type: SET_USERS_TO_ROOM,
   users
+});
+
+export const setIsConnected = () => ({
+  type: SET_IS_CONNECTED,
+});
+
+export const setIsDisconnected = (isDisconnected) => ({
+  type: SET_IS_DISCONNECTED,
+  isDisconnected
 });
 
 export const setIsMounted = () => ({
@@ -214,7 +241,11 @@ export const resetRoomHistory = () => ({
 export const getRoomHistory = (roomId, userName) => async (dispatch) => {
   try {
     let response = await historyApi.getRoomHistory(roomId);
-    let modifiedResponse = response.data.map(item => item.history);
+    let modifiedResponse = response.data.map(item => {
+      let obj = {...item.history};
+      obj.createdat = item.createdat;
+      return obj;
+    });
     console.log('[HISTORY]', response)
     dispatch(setRoomHistory(modifiedResponse, userName, response.data[0].roomid))
   } catch (err) {

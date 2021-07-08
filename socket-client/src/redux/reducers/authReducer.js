@@ -1,12 +1,15 @@
 import {authAPI} from "../../api/api";
 import {reset} from "redux-form";
+import {setIdRoom, setInRoom} from "./socketReducer";
 
 const SET_AUTH_USER_DATA = 'SET_AUTH_USER_DATA';
+const SET_IS_CONNECTED = 'SET_IS_CONNECTED';
 
 let initialState = {
     userId: null,
     userName: null,
     token: null,
+    isConnected: false
 };
 
 const authReducer = (state = initialState, action) => {
@@ -16,6 +19,12 @@ const authReducer = (state = initialState, action) => {
                 ...state,
                 ...action.data
             };
+
+            case SET_IS_CONNECTED:
+            return {
+                ...state,
+               isConnected: true
+            };
         default:
             return state;
     }
@@ -24,6 +33,10 @@ const authReducer = (state = initialState, action) => {
 export const setAuthUserData = (userId, userName, token) => ({
     type: SET_AUTH_USER_DATA,
     data: {userId, userName, token}
+});
+
+export const setIsConnected = () => ({
+    type: SET_IS_CONNECTED
 });
 
 
@@ -42,6 +55,7 @@ export const login = (password, userName) => async (dispatch) => {
                 timestamp: Date.now()
             }
             window.localStorage.setItem("user", JSON.stringify(user))
+
         }
         else {
             let message = response.data.messages.length > 0 ? response.data.messages[0] : "Some error";

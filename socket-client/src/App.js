@@ -16,15 +16,11 @@ import Game from "./components/Games/Game";
 import {generateUID} from "./utils/generateUID";
 import Auth from "./components/Auth/Auth";
 
+
+
 class App extends React.Component {
 
-  componentDidMount() {
-
-    if (!JSON.parse(sessionStorage.getItem('tabId'))) {
-      let tabId = generateUID();
-      window.sessionStorage.setItem("tabId", JSON.stringify(tabId))
-    }
-
+  checkConnection = () => {
     if (JSON.parse(localStorage.getItem('user'))) {
       let user = JSON.parse(localStorage.getItem('user'));
       if (user.timestamp > Date.now() - 3600000) {
@@ -34,13 +30,25 @@ class App extends React.Component {
         this.props.setAuthUserData(null, null, null)
       }
     }
+    else {
+      this.props.setAuthUserData(null, null, null)
+    }
+  }
+
+  componentDidMount() {
+    this.checkConnection();
+    setInterval(() => {
+      console.log(111)
+     this.checkConnection()
+    }, 1000)
+
   }
 
   render() {
 
     return <div className="App">
       <div className='app-wrapper-content'>
-        {/*<Auth/>*/}
+        <Auth/>
         <Switch>
           <DashboardLayoutRoute exact path='/' component={Home}/>
           <DashboardLayoutRoute path='/game/:gameId' component={Game}/>

@@ -9,9 +9,9 @@ import {login} from "../../redux/reducers/authReducer";
 import board from "../../assets/image/board.png";
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import {faHome} from "@fortawesome/free-solid-svg-icons";
+import {setIdRoom, setInRoom} from "../../redux/reducers/socketReducer";
 
 const LoginForm = (props) => {
-
     return <div className={classes.container}>
 
         <div className={classes.wrap}>
@@ -45,15 +45,24 @@ const LoginForm = (props) => {
 
 const LoginReduxForm = reduxForm({form: 'login'})(LoginForm)
 
-const Login = (props) => {
-    console.log("LOOOGIIIIIIIIIIIIIIN");
-    const onSubmit = async (formData) => {
-        props.login(formData.password, formData.userName)
+class Login extends React.Component {
+
+    // props.setIdRoom(null);
+
+    onSubmit = async (formData) => {
+        this.props.setIdRoom(null)
+        this.props.setInRoom(null)
+        this.props.login(formData.password, formData.userName)
     }
 
-    if (props.userData.token) {
-        return <Redirect to={"/"}/>
+    componentWillUnmount() {
+
     }
+
+    render() {
+
+    console.log("LOOOGIIIIIIIIIIIIIIN");
+
     return <div className={classes.wrapMain}>
         <div title={'Home'} className={classes.exit}><NavLink to={'/'}><FontAwesomeIcon className={`${classes.marginHome} fa-lg`} icon={faHome}/></NavLink></div>
         <div className={classes.wrapper}>
@@ -62,14 +71,15 @@ const Login = (props) => {
                      src={board}
                      alt=""/>
             </div>
-            <div className={classes.wrapTitle}><h1>Minesweeper</h1></div>
+            <div className={classes.wrapTitle}><h1>Messenger</h1></div>
         </div>
-        <LoginReduxForm onSubmit={onSubmit}/>
+        <LoginReduxForm onSubmit={this.onSubmit}/>
     </div>
+}
 }
 
 const mapStateToProps = (state) => ({
     userData: state.auth
 })
 
-export default connect(mapStateToProps, {login})(Login);
+export default connect(mapStateToProps, {login, setInRoom, setIdRoom})(Login);

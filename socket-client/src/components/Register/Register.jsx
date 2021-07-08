@@ -61,7 +61,7 @@ const Register = (props) => {
                      src={board}
                      alt=""/>
             </div>
-            <div className={classes.wrapTitle}><h1>Minesweeper</h1></div>
+            <div className={classes.wrapTitle}><h1>Messenger</h1></div>
         </div>
         <RegisterReduxForm onSubmit={onSubmit}/>
     </div>

@@ -142,10 +142,21 @@ io.on("connection", async (socket) => {
   if (socketMap[socket.handshake.query.tabId]) {
     isReconnected[socket.handshake.query.tabId] = true;
   }
+  // delete socketMap[socket.handshake.query.tabId]
 
-  socketMap[socket.handshake.query.tabId] = socket;
+  let tmp = socket.id;
+  console.log(tmp);
+    socketMap[socket.handshake.query.tabId] = socket;
 
-  let tab = await Tabs.getTabById(socket.handshake.query.tabId);
+
+
+  // let tab = await Tabs.getTabById(socket.handshake.query.tabId);
+  let tab = await Tabs.findOne({
+    where: {
+      tabid: socket.handshake.query.tabId,
+      userid: user.userid
+    }
+  })
   // let deletedTab = await Tabs.destroy({
   //   where: {
   //     tabid: socket.handshake.query.tabId
@@ -155,6 +166,17 @@ io.on("connection", async (socket) => {
   for(let key in socketMap) {
     console.log(socketMap[key].id);
   }
+
+  // let userTab = await Tabs.findOne({
+  //   where: {
+  //     userid: user.userid
+  //   }
+  // })
+
+  // if(!userTab) {
+  //   tab = await user.createTab({tabid: socket.handshake.query.tabId});
+  // }
+  //
   if (!tab) {
     tab = await user.createTab({tabid: socket.handshake.query.tabId});
   }
@@ -313,6 +335,12 @@ io.on("connection", async (socket) => {
   })
 
   socket.on('disconnect', async (data) => {
+    await Tabs.destroy({
+      where: {
+        tabid: tab.tabid,
+        userid: user.userid
+      }
+    });
     if (isReconnected[socket.handshake.query.tabId]) {
       delete isReconnected[socket.handshake.query.tabId];
       return;

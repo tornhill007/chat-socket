@@ -18,71 +18,50 @@ class Home extends React.Component {
   constructor(props) {
     super(props);
 
-    // this.props.setInRoom(true);
-
     this.state = {
-      socket: null,
-      allMsg: [],
       textInput: '',
-      roomInput: '',
-      roomId: '',
-      user: {
-        user: {
-          userName: "Andrew",
-          id: 555
-        },
-        room: {
-          id: 123,
-          roomName: "New Game"
-        }
-      }
     }
-  }
-
-  setMessage = (data) => {
-    console.log(this.state.allMsg)
-    let newMsg = [...this.state.allMsg];
-    newMsg.push(data);
-    // newMsg.push(5);
-    this.setState({
-      allMsg: newMsg
-    })
   }
 
   onExitFromRoom = (userId) => {
     this.props.socket && this.props.socket.emit("users/left", () => {
-      console.log("USER LEFT ROOM");
       // this.props.setIsSocket(false)
       this.props.setInRoom(null);
       this.props.setIdRoom(null);
+      // this.props.setIsSocket(true);
       // this.props.resetRoomHistory()
-      this.props.setIsMounted(false)
-      this.props.setSocket(null)
+      // this.props.setIsMounted(false)
+      // this.props.setSocket(null)
       // window.location.reload();
     })
   }
 
+
+  componentDidUpdate(prevProps, prevState, snapshot) {
+
+    prevProps.socket && prevProps.socket.off('messages/new');
+    this.props.socket && this.props.socket.off("messages/new")
+      this.props.socket && this.props.socket.on("messages/new", (data) => {
+        console.log("[DATA1]", data);
+        setTimeout(() => {
+          this.props.updateMessage(data, this.props.userName)
+        }, 100)
+      })
+
+
+    // this.props.setIsSocket(true)
+
+  }
+
+
+
+
   componentDidMount() {
+
+
 
     this.props.resetRoomHistory()
     this.props.getRoomHistory(this.props.match.params.gameId, this.props.userName);
-
-    this.props.socket && this.props.socket.on("messages/new", (data) => {
-
-      console.log("[DATA1]", data);
-      // this.setMessage(data)
-      setTimeout(() => {
-        this.props.updateMessage(data, this.props.userName)
-      }, 100)
-
-    })
-
-    // this.props.socket && this.props.socket.emit("users/get", (data) => {
-    //
-    //   console.log("[DATA555]", data);
-    //
-    //
-    // })
 
     this.props.socket && this.props.socket.on("allUsersInRoom", (data) => {
       console.log("[USERS]", data);
@@ -98,19 +77,12 @@ class Home extends React.Component {
   }
 
   componentWillUnmount() {
-    // this.props.setIsSocket(false);
+    // this.props.setIsSocket(false)
     if (this.props.socket) {
-      console.log("TEST_TEST_TEST_TEST")
       this.props.socket.off('messages/new');
       this.props.socket.off('allUsersInRoom');
-
     }
   }
-
-  //
-  // onEmit = () => {
-  //     this.state.socket.emit("send message", "TEST");
-  // }
 
   onChangeTextInput = (e) => {
     this.setState({
@@ -118,16 +90,6 @@ class Home extends React.Component {
     })
   }
 
-  onChangeRoomInput = (e) => {
-    this.setState({
-      roomInput: e.target.value
-    })
-  }
-  onChangeRoomId = (e) => {
-    this.setState({
-      roomId: e.target.value
-    })
-  }
 
   onAddMessage = () => {
     this.props.socket && this.props.socket.emit("createMessage", {message: this.state.textInput}, (data) => {
@@ -136,51 +98,12 @@ class Home extends React.Component {
     });
   }
 
-  onCreateRoom = () => {
-    this.props.socket && this.props.socket.emit("users/joined", {
-      userName: this.props.userName,
-      id: this.props.token,
-      room: {name: this.state.roomInput, id: this.props.match.params.gameId ? this.props.match.params.gameId : null}
-    }, (data) => {
-      if (typeof data === 'string') {
-        console.error(data);
-      } else {
-        let user = Object.assign({}, this.state.user)
-        user.user.userId = data.userId;
-        this.setState({
-          user
-        })
-      }
-    })
-  }
-
-  onGetRooms = () => {
-
-  }
-
-  // componentDidUpdate(prevProps, prevState, snapshot) {
-  //   if(prevProps.socket !== this.props.socket) {
-  //     this.props.setSocket(this.props.socket);
-  //   }
-  // }
-
   render() {
-    // console.log("[USERSS]", this.props.users)
-    // console.log("[roomHistory]", this.props.roomHistory)
-    // console.log('[allMsg]', this.state.allMsg)
-    console.log("[STORE_SOCKET_ID]", this.props.socket && this.props.socket.id)
-    console.log('[socket_ID]', this.props.socket && this.props.socket.id)
-    console.log('[PROPS]', this.props)
     if (this.props.inRoom === false || this.props.inRoom === null) {
       return <Redirect to='/'/>
     }
-    if (!this.props.token) {
-      return <Redirect to='/login'/>
-    } else return (
+      return (
       <div>
-        {/*<div onClick={() => {this.onGetClients()}}>*/}
-        {/*    CLIENTS*/}
-        {/*</div>*/}
         <div onClick={() => {
           this.onAddMessage()
         }}>Add message
@@ -194,19 +117,6 @@ class Home extends React.Component {
           }}>EXIT
           </button>
         </div>
-        {/*<div onClick={() => {this.onCreateRoom()}}>*/}
-        {/*    create room*/}
-        {/*</div>*/}
-        {/*<div>*/}
-        {/*    <input onChange={this.onChangeRoomInput} value={this.state.roomInput} type="text"/>*/}
-        {/*</div>*/}
-
-        {/*<div>*/}
-        {/*    <input placeholder={"id"} onChange={this.onChangeRoomId} value={this.state.roomId} type="text"/>*/}
-        {/*</div>*/}
-        {/*<div onClick={() => {this.onGetRooms()}}>*/}
-        {/*    GET ROOMS*/}
-        {/*</div>*/}
         <div className={classes.wrapUsers}>
           <div>
             USERS IN ROOM
@@ -220,7 +130,6 @@ class Home extends React.Component {
         <div className={classes.wrapWrapper}>
           <div className={classes.wrapMessages}>
             {this.props.roomHistory.map((item, index) => {
-              console.log(this.props.userName, item.name)
               return this.props.userName !== item.name ? <div key={index}>
                 <div
                   className={`${item.name === 'admin' ? classes.itemLeft : classes.itemLeftUser}`}>[{item.name}] {item.text}</div>

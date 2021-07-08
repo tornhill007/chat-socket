@@ -5,7 +5,7 @@ import {connect} from "react-redux";
 import {generateUID} from "../../utils/generateUID";
 import {
   setIdRoom,
-  setInRoom,
+  setInRoom, setIsDisconnected,
   setIsMounted, setIsSocket,
   setRooms,
   setSocket,
@@ -14,6 +14,7 @@ import {
 import {withRouter} from 'react-router-dom';
 import classes from './Home.module.css';
 import socket from '../../api/socket'
+import {setAuthUserData} from "../../redux/reducers/authReducer";
 
 
 class Home extends React.Component {
@@ -23,153 +24,15 @@ class Home extends React.Component {
 
     this.state = {
       socket: null,
-      allMsg: [],
-      textInput: '',
       roomInput: '',
-      roomId: '',
-      user: {
-        user: {
-          userName: "Andrew",
-          id: 555
-        },
-        room: {
-          id: 123,
-          roomName: "New Game"
-        }
-      }
     }
-  }
-
-
-  setMessage = (data) => {
-    console.log(this.state.allMsg)
-    let newMsg = [...this.state.allMsg];
-    newMsg.push(data);
-    // newMsg.push(5);
-    this.setState({
-      allMsg: newMsg
-    })
-
-  }
-
-  setRooms = (rooms) => {
-    this.props.setRooms(rooms);
-  }
-
-  setUsersToRoom = (users) => {
-    this.props.setUsersToRoom(users);
-  }
-
-  componentWillUnmount() {
-    this.props.setIsSocket(false);
   }
 
   componentDidMount() {
-    if (!this.props.isSocketExist) {
-
-      let socket;
-// if(this.props.socket) {
-//   return;
-// }
-      console.log("OLAOLALOLAOAL")
-
-      if (this.props.token && JSON.parse(sessionStorage.getItem('tabId'))) {
-        socket = io('http://192.168.1.229:8080/', {
-          query: {
-            tabId: JSON.parse(sessionStorage.getItem('tabId')),
-            loggeduser: this.props.token
-          }
-        });
-
-        socket.on("connect", () => {
-          console.log("sockett_ID", socket.id)
-          this.props.setSocket(socket);
-          // if(this.props.socket && socket.id !== this.props.socket.id) {
-          //
-          // }
-        });
-      }
-
-      // if(this.props.token && JSON.parse(sessionStorage.getItem('tabId'))) {
-      //
-      // }
-
-      socket && socket.emit("rooms/get", {}, (data) => {
-      })
-
-      socket && socket.on("rooms/getAll", (data) => {
-        console.log("[ROOMS]", data);
-        this.setRooms(data);
-
-      })
-
-      socket && socket.on("disconnect/sendUserInfo", (data) => {
-        console.log("ROOOOM_IDDDD", data);
-        if (data) {
-          this.props.setIdRoom(data);
-          this.props.setInRoom(true);
-        }
-      })
-
-      socket && socket.on("users/update", (data) => {
-        console.log("[USERS]", data);
-        this.setUsersToRoom(data);
-      })
-
-      socket && socket.on('rooms/generateId', (data) => {
-        console.log("ID_ROOM", data)
-        this.props.setIdRoom(data);
-      })
-
-      // }
-      //     this.props.setIsMounted();
-      // }
-
-      // let rooms = io.sockets.adapter.rooms;
-      // console.log("ROOMS", rooms)
-      this.setState({
-        socket: socket
-      })
-
-      // socket.emit("allRooms", )
-
-      // socket.on("newMessage", (data) => {
-      //     console.log("[DATA]", data);
-      //     this.setMessage(data)
-      // })
-    }
-    this.props.setIsSocket(true)
+    this.setState({
+      socket: socket
+    })
   }
-
-
-  // componentDidUpdate(prevProps, prevState, snapshot) {
-  //   if(prevState.socket !== this.state.socket) {
-  //     this.state.socket.on("messages/new", (data) => {
-  //
-  //       console.log("[DATA1]", data);
-  //       // this.setMessage(data)
-  //       setTimeout(() => {
-  //         this.props.updateMessage(data, this.props.userName)
-  //       }, 100)
-  //
-  //     })
-  //   }
-  // }
-
-  // componentWillUnmount() {
-  //   alert(1)
-  //   this.props.setIsSocket(false);
-  // }
-
-  getRooms = () => {
-    this.props.socket.emit("rooms/get")
-  }
-
-  // getUsers = () => {
-  //     this.props.socket.on("updateUsers", (data) => {
-  //         console.log("USSSEERS", data);
-  //     })
-  // }
 
   onChangeRoomInput = (e) => {
     this.setState({
@@ -178,7 +41,6 @@ class Home extends React.Component {
   }
 
   onCreateRoom = (roomId) => {
-    console.log("ROOM_ID", roomId)
     this.props.socket && this.props.socket.emit("users/joined", {
       room: {
         name: this.state.roomInput,
@@ -197,10 +59,15 @@ class Home extends React.Component {
     })
   }
 
+  logout = () => {
+    window.localStorage.removeItem('user');
+    // this.props.setAuthUserData(null, null, null);
+    // this.props.setInRoom(null);
+    // this.props.setIdRoom(null);
+    this.props.history.push('/login')
+  }
 
   render() {
-    // console.log("[STORE_SOCKET_ID]", this.props.socket.id)
-    console.log("[IN_ROOM]", this.props.inRoom)
     if (this.props.idRoom && this.props.inRoom) {
       return <Redirect to={{
         pathname: `/game/${this.props.idRoom}`,
@@ -208,21 +75,13 @@ class Home extends React.Component {
           socket: this.state.socket
         }
       }}/>
-    }
-    if (!this.props.token) {
-      return <Redirect to='/login'/>
     } else return (
       <div>
-        {/*<div onClick={() => {this.getRooms()}}>*/}
-        {/*    getRooms*/}
-        {/*</div>*/}
-        {/*                <div onClick={() => {this.getUsers()}}>*/}
-        {/*    getUSERS*/}
-        {/*</div>*/}
         <div>
           ROOMS LIST
           {this.props.rooms.map((item, index) => {
             return <NavLink key={index} onClick={() => {
+
               this.props.setInRoom(true);
               this.onCreateRoom(item.roomid)
             }} to={`/game/${item.roomid}`}>
@@ -239,19 +98,19 @@ class Home extends React.Component {
           this.props.setInRoom(true);
           this.onCreateRoom()
         }}>
-          {/*to={`/game/${generateUID()}`*/}
           <div className={classes.itemCreate}>
             create room
           </div>
-          {/*<NavLink>*/}
-          {/*    Connect to room*/}
-          {/*</NavLink>*/}
+
+        </div>
+        <div onClick={() => {
+          this.logout()
+        }}>LOG OUT
         </div>
 
       </div>
     );
   }
-
 }
 
 const mapStateToProps = (state) => ({
@@ -264,9 +123,8 @@ const mapStateToProps = (state) => ({
   idRoom: state.socketPage.idRoom,
   isMounted: state.socketPage.isMounted,
   isSocketExist: state.socketPage.isSocketExist,
+  isDisconnected: state.socketPage.isDisconnected,
 })
-
-// let AuthRedirectComponent = withAuthRedirect(Home);
 
 export default withRouter(connect(mapStateToProps, {
   setSocket,
@@ -276,5 +134,7 @@ export default withRouter(connect(mapStateToProps, {
   setUsersToRoom,
   setRooms,
   setIsSocket,
-  updateMessage
+  updateMessage,
+  setAuthUserData,
+  setIsDisconnected,
 })(Home));

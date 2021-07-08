@@ -11,12 +11,12 @@ const createObjectFromMessage = require('../helpers/createObjectFromMessage')
 
 const exitFromRoom = async (tab, user) => {
 
-  await Tabs.destroy({
-    where: {
-      tabid: tab.tabid,
-      userid: user.userid
-    }
-  });
+  // await Tabs.destroy({
+  //   where: {
+  //     tabid: tab.tabid,
+  //     userid: user.userid
+  //   }
+  // });
 
   let room = await Rooms.findOne({
     include: [{
